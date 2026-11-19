@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.zip">
-    <img src="https://img.shields.io/badge/Baixar_para_macOS-Multitarefa.zip-534AB7?style=for-the-badge&logo=apple&logoColor=white" alt="Baixar para macOS">
+    <img src="Resources/download-button.svg" width="420" alt="Baixar para Mac">
   </a>
 </p>
 
