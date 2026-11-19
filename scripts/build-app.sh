@@ -18,6 +18,17 @@ mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 cp "$BIN_DIR/$APP" "$BUNDLE/Contents/MacOS/$APP"
 cp Resources/Info.plist "$BUNDLE/Contents/Info.plist"
 
+# Versão: VERSION (ex: 2.0) + número do build do GitHub (ex: 2.0.12)
+BUILD="${BUILD_NUMBER:-0}"
+VERSION="$(tr -d '[:space:]' < VERSION).$BUILD"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$BUNDLE/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$BUNDLE/Contents/Info.plist"
+
+# Logo da empresa
+if [ -f Resources/logo.png ]; then
+  cp Resources/logo.png "$BUNDLE/Contents/Resources/logo.png"
+fi
+
 if [ -f Resources/AppIcon.png ]; then
   ICONSET="$DIST/AppIcon.iconset"
   mkdir -p "$ICONSET"
@@ -40,4 +51,9 @@ cp -R "$BUNDLE" "$STAGE/"
 ln -s /Applications "$STAGE/Aplicativos"
 hdiutil create -volname "$APP" -srcfolder "$STAGE" -ov -format UDZO "$DIST/$APP.dmg"
 rm -rf "$STAGE"
-echo "Pronto: $DIST/$APP.dmg"
+# Arquivo que o app consulta pra saber se tem versão nova
+cat > "$DIST/version.json" <<JSON
+{"version": "$VERSION", "build": $BUILD, "url": "https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/$APP.dmg"}
+JSON
+
+echo "Pronto: $DIST/$APP.dmg (versão $VERSION)"

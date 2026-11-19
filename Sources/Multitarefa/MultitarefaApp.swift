@@ -17,6 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         false
     }
 
+    /// Se tem atualização baixada, instala quando o app fecha.
+    func applicationWillTerminate(_ notification: Notification) {
+        Updater.shared.installOnQuitIfReady()
+    }
+
     /// Mostra a notificação mesmo com o app em primeiro plano.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
@@ -34,17 +39,26 @@ struct MultitarefaApp: App {
         Window("Multitarefa", id: "main") {
             ContentView()
                 .environmentObject(store)
-                .frame(minWidth: 460, minHeight: 520)
+                .frame(minWidth: 620, minHeight: 640)
         }
-        .defaultSize(width: 520, height: 680)
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 680, height: 780)
         .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Configurações…") { store.showSettings = true }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
             CommandMenu("Tarefas") {
                 Button("Iniciar ou pausar") { store.toggleRunning() }
                     .keyboardShortcut(.return, modifiers: .command)
-                Button("Próxima tarefa") { store.skip() }
+                Button("Próxima tarefa") { store.next() }
                     .keyboardShortcut(.rightArrow, modifiers: .command)
                 Button("Concluir tarefa atual") { store.completeCurrent() }
                     .keyboardShortcut("d", modifiers: .command)
+                Button("Editar tarefa atual") {
+                    if let c = store.current { store.edit(c.id) }
+                }
+                .keyboardShortcut("e", modifiers: .command)
             }
         }
 
@@ -61,7 +75,7 @@ struct MenuBarLabel: View {
     @ObservedObject var store: TaskStore
 
     var body: some View {
-        let icon = store.isRunning ? "timer" : "pause.circle"
+        let icon = store.isTimeUp ? "bell.fill" : (store.isRunning ? "timer" : "pause.circle")
         if store.current == nil {
             Image(systemName: "timer")
         } else {
@@ -78,10 +92,14 @@ struct MenuBarContent: View {
     var body: some View {
         if let c = store.current {
             Text("Agora: \(c.title)")
-            Text("Restam \(Format.clock(c.remaining)) · total \(Format.duration(c.totalSeconds))")
+            Text(c.isTimeUp ? "Tempo esgotado" : "Restam \(Format.clock(c.remaining)) · total \(Format.duration(c.totalSeconds))")
             Divider()
-            Button(store.isRunning ? "Pausar" : "Iniciar") { store.toggleRunning() }
-            Button("Próxima tarefa") { store.skip() }
+            if c.isTimeUp {
+                Button("+5 min") { store.addTime(c.id, seconds: 5 * 60) }
+            } else {
+                Button(store.isRunning ? "Pausar" : "Iniciar") { store.toggleRunning() }
+            }
+            Button("Próxima tarefa") { store.next() }
             Button("Concluir tarefa atual") { store.completeCurrent() }
         } else {
             Text("Nenhuma tarefa na fila")

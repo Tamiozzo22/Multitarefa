@@ -2,7 +2,7 @@ name: Compilar app
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'v2']
   workflow_dispatch:
 
 permissions:
@@ -10,26 +10,29 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Compilar Multitarefa.app
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
         run: bash scripts/build-app.sh
 
       - name: Guardar o app como artefato
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Multitarefa
           path: dist/Multitarefa.dmg
 
       - name: Publicar na página de Releases
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
           sleep 3
-          gh release create latest dist/Multitarefa.dmg \
+          gh release create latest dist/Multitarefa.dmg dist/version.json \
             --target "$GITHUB_SHA" \
-            --title "Multitarefa (versão mais recente)" \
+            --title "Multitarefa $(tr -d '[:space:]' < VERSION).${{ github.run_number }}" \
             --notes "Baixe o Multitarefa.dmg abaixo, abra e arraste o Multitarefa para a pasta Aplicativos. Na primeira vez, libere em Ajustes do Sistema > Privacidade e Segurança > Abrir Mesmo Assim."
