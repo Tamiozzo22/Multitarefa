@@ -19,14 +19,14 @@ struct TaskItem: Identifiable, Codable, Equatable {
     var totalSeconds: Int = 0
     /// Quantas rodadas a tarefa já teve.
     var rounds: Int = 0
-    /// Anotações, da mais antiga pra mais nova.
+    /// Anotações, da mais antiga para mais nova.
     var notes: [NoteEntry] = []
     var createdAt: Date = Date()
     var completedAt: Date? = nil
     var archivedAt: Date? = nil
     /// Tags (ids de TagDef).
     var tagIDs: [UUID] = []
-    /// Quando foi pra lixeira e de onde veio.
+    /// Quando foi para lixeira e de onde veio.
     var deletedAt: Date? = nil
     var deletedFrom: TaskOrigin? = nil
 
@@ -86,7 +86,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
     }
 }
 
-/// De onde a tarefa veio (pra voltar da lixeira pro lugar certo).
+/// De onde a tarefa veio (para voltar da lixeira para o lugar certo).
 enum TaskOrigin: String, Codable {
     case queue, archived, completed
 

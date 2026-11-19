@@ -18,6 +18,7 @@ final class Updater: ObservableObject {
         case upToDate
         case downloading(String)
         case ready(String)
+        case installing
         case failed(String)
     }
 
@@ -35,7 +36,7 @@ final class Updater: ObservableObject {
 
     var isBusy: Bool {
         switch state {
-        case .checking, .downloading: return true
+        case .checking, .downloading, .installing: return true
         default: return false
         }
     }
@@ -45,7 +46,7 @@ final class Updater: ObservableObject {
         return false
     }
 
-    private var installerLaunched = false
+    private var installed = false
 
     private var stagingDir: URL {
         Persistence.fileURL.deletingLastPathComponent().appendingPathComponent("Update", isDirectory: true)
@@ -63,7 +64,7 @@ final class Updater: ObservableObject {
         guard !isBusy, !isReady else { return }
 
         guard installedApp.pathExtension == "app" else {
-            state = .failed("A atualização só funciona no app instalado.")
+            state = .failed("A atualização só funciona com o aplicativo instalado.")
             return
         }
         let parent = installedApp.deletingLastPathComponent().path
@@ -85,12 +86,12 @@ final class Updater: ObservableObject {
 
     private func handleFeed(data: Data?, response: URLResponse?, error: Error?) {
         if error != nil {
-            state = .failed("Sem conexão com o GitHub. Tente de novo.")
+            state = .failed("Não foi possível conectar ao GitHub. Tente novamente.")
             return
         }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, let data = data,
               let remote = try? JSONDecoder().decode(RemoteVersion.self, from: data) else {
-            state = .failed("Não consegui ler a versão publicada. Tente de novo em alguns minutos.")
+            state = .failed("Não foi possível ler a versão publicada. Tente novamente em alguns minutos.")
             return
         }
         guard remote.build > currentBuild, let url = URL(string: remote.url) else {
@@ -110,7 +111,7 @@ final class Updater: ObservableObject {
         URLSession.shared.downloadTask(with: request) { tempURL, response, error in
             guard let tempURL = tempURL, error == nil,
                   (response as? HTTPURLResponse)?.statusCode == 200 else {
-                DispatchQueue.main.async { self.state = .failed("O download falhou. Tente de novo.") }
+                DispatchQueue.main.async { self.state = .failed("O download falhou. Tente novamente.") }
                 return
             }
             let fm = FileManager.default
@@ -123,7 +124,7 @@ final class Updater: ObservableObject {
             } catch {
                 try? fm.removeItem(at: dmg)
                 DispatchQueue.main.async {
-                    self.state = .failed("Não consegui preparar a atualização (\(error.localizedDescription)).")
+                    self.state = .failed("Não foi possível preparar a atualização (\(error.localizedDescription)).")
                 }
             }
         }.resume()
@@ -143,7 +144,7 @@ final class Updater: ObservableObject {
         let source = mountPoint.appendingPathComponent("Multitarefa.app")
         guard fm.fileExists(atPath: source.path) else {
             throw NSError(domain: "Updater", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "app não encontrado no DMG"])
+                          userInfo: [NSLocalizedDescriptionKey: "aplicativo não encontrado no DMG"])
         }
         try? fm.removeItem(at: stagedApp)
         try fm.createDirectory(at: stagingDir, withIntermediateDirectories: true)
@@ -169,39 +170,100 @@ final class Updater: ObservableObject {
 
     // MARK: - Instalar
 
-    /// Fecha o app, troca pela versão nova e abre de novo.
+    /// Substitui o aplicativo instalado pela versão preparada.
+    /// Funciona com o aplicativo aberto: o processo atual continua até ser reiniciado.
+    private func swapInstalledApp() throws {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: stagedApp.path) else {
+            throw NSError(domain: "Updater", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "a versão baixada não foi encontrada"])
+        }
+        let target = installedApp
+        let parent = target.deletingLastPathComponent()
+        let fresh = parent.appendingPathComponent(".Multitarefa-novo.app", isDirectory: true)
+        let old = parent.appendingPathComponent(".Multitarefa-antigo.app", isDirectory: true)
+        try? fm.removeItem(at: fresh)
+        try? fm.removeItem(at: old)
+        log("Instalando em \(target.path)")
+        try run("/usr/bin/ditto", [stagedApp.path, fresh.path])
+        _ = try? run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", fresh.path])
+        try fm.moveItem(at: target, to: old)
+        do {
+            try fm.moveItem(at: fresh, to: target)
+        } catch {
+            try? fm.moveItem(at: old, to: target)
+            throw error
+        }
+        try? fm.removeItem(at: old)
+        try? fm.removeItem(at: stagedApp)
+        installed = true
+        log("Instalação concluída")
+    }
+
+    /// Instala a nova versão e reinicia o aplicativo.
     func installAndRelaunch() {
         guard isReady else { return }
-        launchInstaller(relaunch: true)
-        NSApp.terminate(nil)
+        state = .installing
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try self.swapInstalledApp()
+                DispatchQueue.main.async { self.relaunch() }
+            } catch {
+                self.log("Falha na instalação: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.state = .failed("Não foi possível instalar a atualização (\(error.localizedDescription)). Verifique se o Multitarefa está na pasta Aplicativos.")
+                }
+            }
+        }
     }
 
-    /// Chamado quando o app fecha: se já tem atualização baixada, instala.
-    func installOnQuitIfReady() {
-        guard isReady else { return }
-        launchInstaller(relaunch: false)
-    }
-
-    private func launchInstaller(relaunch: Bool) {
-        guard !installerLaunched, FileManager.default.fileExists(atPath: stagedApp.path) else { return }
-        installerLaunched = true
+    /// Abre o aplicativo novamente assim que este processo terminar.
+    private func relaunch() {
         let pid = ProcessInfo.processInfo.processIdentifier
         let target = installedApp.path
-        let staged = stagedApp.path
-        let script = """
-        while kill -0 \(pid) 2>/dev/null; do sleep 0.3; done
-        rm -rf "\(target).novo"
-        if /usr/bin/ditto "\(staged)" "\(target).novo"; then
-          rm -rf "\(target)" && mv "\(target).novo" "\(target)" && rm -rf "\(staged)"
-        fi
-        /usr/bin/xattr -dr com.apple.quarantine "\(target)" 2>/dev/null
-        \(relaunch ? "/usr/bin/open \"\(target)\"" : "")
-        """
+        let script = "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"\(target)\""
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = ["-c", script]
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
-        try? p.run()
+        do {
+            try p.run()
+        } catch {
+            log("Falha ao agendar a reabertura: \(error.localizedDescription)")
+        }
+        log("Reiniciando")
+        // Fecha janelas e folhas abertas antes de encerrar.
+        for window in NSApp.windows {
+            if let sheet = window.attachedSheet { window.endSheet(sheet) }
+        }
+        NSApp.terminate(nil)
+        // Garantia: se o encerramento normal for bloqueado, encerra mesmo assim.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { exit(0) }
+    }
+
+    /// Chamado quando o aplicativo é fechado: se já existe atualização baixada, instala.
+    func installOnQuitIfReady() {
+        guard isReady, !installed else { return }
+        do {
+            try swapInstalledApp()
+        } catch {
+            log("Falha na instalação ao fechar: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Registro
+
+    private func log(_ message: String) {
+        let url = Persistence.fileURL.deletingLastPathComponent().appendingPathComponent("update.log")
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? data.write(to: url)
+        }
     }
 }

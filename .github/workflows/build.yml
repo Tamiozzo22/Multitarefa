@@ -1,4 +1,4 @@
-name: Compilar app
+name: Compilar aplicativo
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: bash scripts/build-app.sh
 
-      - name: Guardar o app como artefato
+      - name: Guardar o aplicativo como artefato
         uses: actions/upload-artifact@v5
         with:
           name: Multitarefa
@@ -35,4 +35,4 @@ jobs:
           gh release create latest dist/Multitarefa.dmg dist/version.json \
             --target "$GITHUB_SHA" \
             --title "Multitarefa $(tr -d '[:space:]' < VERSION).${{ github.run_number }}" \
-            --notes "Baixe o Multitarefa.dmg abaixo, abra e arraste o Multitarefa para a pasta Aplicativos. Na primeira vez, libere em Ajustes do Sistema > Privacidade e Segurança > Abrir Mesmo Assim."
+            --notes "Faça o download do arquivo Multitarefa.dmg abaixo, abra-o e arraste o Multitarefa para a pasta Aplicativos. Na primeira execução, autorize o aplicativo em Ajustes do Sistema > Privacidade e Segurança > Abrir Mesmo Assim."

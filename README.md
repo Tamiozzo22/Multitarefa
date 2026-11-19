@@ -12,22 +12,26 @@
 
 <p align="center">macOS 14 ou mais novo · Liquid Glass no macOS 26+ · Apple Silicon e Intel</p>
 
-App de Mac da **Impera Services** para trabalhar em várias tarefas em rodízio, com timer por tarefa.
+Aplicativo para macOS da **Impera Services** que organiza o trabalho em várias tarefas por meio de rodadas cronometradas.
 
-## Como funciona
+## Funcionalidades
 
-- **Rodadas com timer:** a tarefa do topo da fila é a atual. Cada rodada tem 10 minutos por padrão (dá pra mudar por tarefa).
-- **Você decide quando trocar:** quando o tempo acaba, o alarme toca, aparece uma notificação e o timer para em 00:00. Aí é com você: **Próxima tarefa** ou **+5 min**.
-- **Fazer agora:** o botão ▶ de qualquer tarefa da fila pula direto pra ela.
-- **Editar durante a execução:** título, duração da rodada, tempo restante e anotações, tudo com o timer rodando.
-- **Anotações com horário:** cada tarefa tem um diário de anotações. Ao trocar de tarefa, o app pergunta "onde você parou?".
-- **Aviso de 1 minuto** antes do fim da rodada.
-- **Concluir e arquivar:** concluídas vão pro **Histórico** com o tempo total gasto (todas as rodadas somadas); arquivadas ficam guardadas pra depois.
-- **Barra de menus:** o tempo restante fica sempre visível lá em cima. Fechar a janela não para o timer.
-- **Atualização automática:** em Configurações (⚙ ou ⌘,), **Buscar atualização** baixa e instala a versão nova do GitHub.
-- **Salva sozinho** em `~/Library/Application Support/Multitarefa/`.
+- **Rodadas cronometradas:** a tarefa no topo da fila é a tarefa atual. Cada rodada dura 10 minutos por padrão, e a duração pode ser alterada individualmente.
+- **Troca manual:** ao fim do tempo, o alarme toca, uma notificação é exibida e o cronômetro para em 00:00. A troca de tarefa ocorre somente quando você a solicita.
+- **Alarme persistente:** se nenhuma ação for realizada no aplicativo em até 5 segundos após o alarme, ele toca novamente, até que você interaja com o aplicativo.
+- **Registro de onde parou:** antes de trocar de tarefa, o aplicativo solicita uma anotação sobre o ponto em que você parou.
+- **Iniciar agora:** o botão ▶ de qualquer tarefa da fila permite passar diretamente para ela.
+- **Edição durante a execução:** título, duração da rodada, tempo restante, tags e anotações podem ser alterados com o cronômetro em andamento.
+- **Anotações com data e hora:** cada tarefa possui um histórico próprio de anotações.
+- **Aviso de 1 minuto** antes do fim de cada rodada.
+- **Concluídas e arquivadas:** as tarefas concluídas vão para o **Histórico**, com o tempo total dedicado a cada uma; as arquivadas ficam guardadas para uso posterior.
+- **Tags:** crie tags com cores, classifique as tarefas e encontre-as rapidamente pela tela de Tags, com busca por título ou anotação.
+- **Lixeira:** as tarefas excluídas permanecem na Lixeira por 5 dias e podem ser recuperadas nesse período. Depois disso, são excluídas definitivamente.
+- **Barra de menus:** o tempo restante permanece visível na barra de menus. Fechar a janela não interrompe o cronômetro.
+- **Atualização automática:** em Configurações (⚙ ou ⌘,), o botão **Buscar atualização** baixa e instala a versão mais recente publicada no GitHub.
+- **Salvamento automático** em `~/Library/Application Support/Multitarefa/`.
 
-### Atalhos
+### Atalhos de teclado
 
 | Atalho | Ação |
 |---|---|
@@ -35,17 +39,18 @@ App de Mac da **Impera Services** para trabalhar em várias tarefas em rodízio,
 | ⌘ → | Próxima tarefa |
 | ⌘ D | Concluir a tarefa atual |
 | ⌘ E | Editar a tarefa atual |
+| ⌘ . | Silenciar o alarme |
 | ⌘ , | Configurações |
 
-## Instalar
+## Instalação
 
-1. Clique no botão **Baixar para macOS** no topo desta página (ou [baixe aqui](https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.dmg)).
-2. Abra o `Multitarefa.dmg` e, na janela que aparecer, arraste o **Multitarefa** para o atalho **Aplicativos**. Depois pode ejetar o disco.
-3. Na primeira vez, o macOS bloqueia porque o app não é de um desenvolvedor registrado na Apple. Vá em **Ajustes do Sistema → Privacidade e Segurança**, desça até o fim e clique em **Abrir Mesmo Assim**. Só precisa fazer isso uma vez.
-4. Permita as notificações quando o app pedir.
+1. Clique no botão **Baixar para Mac** no topo desta página (ou [faça o download aqui](https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.dmg)).
+2. Abra o arquivo `Multitarefa.dmg` e, na janela exibida, arraste o **Multitarefa** para o atalho **Aplicativos**. Em seguida, ejete o disco.
+3. Na primeira execução, o macOS bloqueia o aplicativo por não ser de um desenvolvedor registrado na Apple. Acesse **Ajustes do Sistema → Privacidade e Segurança**, role até o final e clique em **Abrir Mesmo Assim**. Esse procedimento é necessário apenas uma vez.
+4. Autorize as notificações quando solicitado.
 
-## Como o app é compilado
+## Compilação
 
-Toda vez que o código muda na branch `main`, o GitHub Actions compila o app num Mac da nuvem (`scripts/build-app.sh`) e publica o DMG em **Releases → latest**. Dá pra acompanhar na aba **Actions**.
+Sempre que o código é alterado na branch `main`, o GitHub Actions compila o aplicativo em um Mac na nuvem (`scripts/build-app.sh`) e publica o DMG em **Releases → latest**. O andamento pode ser acompanhado na aba **Actions**.
 
-A duração padrão das rodadas fica em `defaultDuration`, em `Sources/Multitarefa/TaskStore.swift`. A versão do app é o conteúdo do arquivo `VERSION` mais o número do build.
+A duração padrão das rodadas é definida em `defaultDuration`, no arquivo `Sources/Multitarefa/TaskStore.swift`. A versão do aplicativo é composta pelo conteúdo do arquivo `VERSION` seguido do número da compilação.

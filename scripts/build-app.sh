@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Compila o Multitarefa.app (Intel + Apple Silicon) e gera dist/Multitarefa.dmg.
-# Roda no GitHub Actions; também funciona num Mac com Xcode: bash scripts/build-app.sh
+# Executado no GitHub Actions; também funciona em um Mac com Xcode: bash scripts/build-app.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -44,14 +44,14 @@ fi
 # Assinatura local (ad-hoc), necessária para rodar em Apple Silicon.
 codesign --force --deep --sign - "$BUNDLE"
 
-# DMG: janela com o app e um atalho para Aplicativos, pra arrastar.
+# DMG: janela com o aplicativo e um atalho para Aplicativos.
 STAGE="$DIST/dmg"
 mkdir -p "$STAGE"
 cp -R "$BUNDLE" "$STAGE/"
 ln -s /Applications "$STAGE/Aplicativos"
 hdiutil create -volname "$APP" -srcfolder "$STAGE" -ov -format UDZO "$DIST/$APP.dmg"
 rm -rf "$STAGE"
-# Arquivo que o app consulta pra saber se tem versão nova
+# Arquivo consultado pelo aplicativo para verificar se há nova versão
 cat > "$DIST/version.json" <<JSON
 {"version": "$VERSION", "build": $BUILD, "url": "https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/$APP.dmg"}
 JSON

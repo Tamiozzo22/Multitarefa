@@ -124,13 +124,13 @@ struct TagsView: View {
                     }
 
                     if store.tags.isEmpty {
-                        Text("Crie sua primeira tag acima. Depois marque as tarefas pelo botão de etiqueta ou ao editar.")
+                        Text("Crie sua primeira tag acima. Em seguida, marque as tarefas pelo botão de etiqueta ou na edição da tarefa.")
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.textMuted)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(10)
                     } else {
-                        Text("Clique com o botão direito numa tag pra renomear, mudar a cor ou excluir.")
+                        Text("Clique com o botão direito em uma tag para renomeá-la, alterar a cor ou excluí-la.")
                             .font(.system(size: 11))
                             .foregroundStyle(Theme.textMuted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -213,11 +213,11 @@ struct TagsView: View {
     }
 
     private var emptyText: String {
-        if !search.isEmpty { return "Nada encontrado pra \"\(search)\"." }
+        if !search.isEmpty { return "Nenhum resultado para \"\(search)\"." }
         switch filter {
         case .all: return scope == .completed ? "Nenhuma tarefa concluída ainda." : "Nenhuma tarefa ainda."
         case .untagged: return "Todas as tarefas já têm tag."
-        case .tag: return "Nenhuma tarefa com essa tag. Marque pelo botão de etiqueta das tarefas."
+        case .tag: return "Nenhuma tarefa com esta tag. Marque as tarefas pelo botão de etiqueta."
         }
     }
 }

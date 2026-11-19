@@ -7,7 +7,7 @@ enum Page {
 }
 
 /// Toda a lógica do app. A tarefa atual é sempre a primeira da fila.
-/// O app nunca troca de tarefa sozinho: quando o tempo acaba, o alarme toca
+/// O app nunca troca de tarefa automaticamente: quando o tempo acaba, o alarme toca
 /// (e repete) até você agir no app.
 final class TaskStore: ObservableObject {
     /// Duração padrão de uma rodada para tarefas novas.
@@ -18,7 +18,7 @@ final class TaskStore: ObservableObject {
     static let durationPresets = [5, 10, 15, 20, 25, 30, 45, 60]
     /// Dias que uma tarefa fica na lixeira.
     static let trashDays = 5
-    /// Espera depois do alarme antes de tocar de novo.
+    /// Intervalo após o alarme antes de tocar novamente.
     static let alarmRepeatDelay: Double = 5
 
     @Published var queue: [TaskItem] = []
@@ -96,7 +96,7 @@ final class TaskStore: ObservableObject {
 
     func isCurrent(_ id: UUID) -> Bool { current?.id == id }
 
-    /// Nome da tarefa pra onde a troca vai levar.
+    /// Nome da tarefa para onde a troca vai levar.
     func switchTargetTitle(_ p: PendingSwitch) -> String? {
         if let t = p.targetID { return task(t)?.title }
         return queue.count > 1 ? queue[1].title : nil
@@ -150,7 +150,7 @@ final class TaskStore: ObservableObject {
            before > Self.warningSeconds, after <= Self.warningSeconds, after > 0 {
             Sound.warning()
             Notifier.send(title: "Falta 1 minuto",
-                          body: "Vá fechando o raciocínio em \"\(queue[0].title)\".")
+                          body: "Comece a concluir o raciocínio em \"\(queue[0].title)\".")
         }
 
         if after <= 0 {
@@ -169,7 +169,7 @@ final class TaskStore: ObservableObject {
             pendingSwitch = PendingSwitch(taskID: c.id, title: c.title, targetID: nil, automatic: true)
         }
         Notifier.send(title: "Tempo de \"\(c.title)\" acabou",
-                      body: "Abra o Multitarefa, anote onde parou e passe pra próxima tarefa.")
+                      body: "Abra o Multitarefa, anote onde parou e passe para a próxima tarefa.")
         startAlarm()
         save()
     }
@@ -204,7 +204,7 @@ final class TaskStore: ObservableObject {
 
     // MARK: - Troca de tarefa (sempre manual, com "onde parei" antes)
 
-    /// Pede pra ir pra próxima: abre o balão na tarefa atual.
+    /// Pede para ir para próxima: abre o balão na tarefa atual.
     func requestNext() {
         guard let c = current else { return }
         stopAlarm()
@@ -212,7 +212,7 @@ final class TaskStore: ObservableObject {
                                       automatic: c.isTimeUp)
     }
 
-    /// Pede pra ir direto pra uma tarefa da fila.
+    /// Pede para ir direto para uma tarefa da fila.
     func requestSwitch(to id: UUID) {
         guard let c = current, c.id != id, queue.contains(where: { $0.id == id }) else { return }
         stopAlarm()
@@ -328,7 +328,7 @@ final class TaskStore: ObservableObject {
 
     // MARK: - Lixeira
 
-    /// Manda pra lixeira (de qualquer lista).
+    /// Manda para lixeira (de qualquer lista).
     func moveToTrash(_ id: UUID) {
         var item: TaskItem?
         var from: TaskOrigin?
@@ -353,7 +353,7 @@ final class TaskStore: ObservableObject {
         save()
     }
 
-    /// Volta da lixeira pro lugar de onde saiu.
+    /// Volta da lixeira para o lugar de onde saiu.
     func restoreFromTrash(_ id: UUID) {
         guard let i = trash.firstIndex(where: { $0.id == id }) else { return }
         var t = trash.remove(at: i)
@@ -398,7 +398,7 @@ final class TaskStore: ObservableObject {
         if trash.count != before { save() }
     }
 
-    /// "Limpar histórico" manda tudo pra lixeira.
+    /// "Limpar histórico" manda tudo para lixeira.
     func clearHistory() {
         let now = Date()
         for var t in completed {

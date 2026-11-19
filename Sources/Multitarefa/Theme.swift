@@ -11,7 +11,7 @@ enum Theme {
     static let hairline = Color.white.opacity(0.1)
 }
 
-/// Fundo escuro com brilhos amarelos suaves (dá profundidade pro vidro).
+/// Fundo escuro com brilhos amarelos suaves (dá profundidade para o vidro).
 struct AppBackground: View {
     var body: some View {
         ZStack {

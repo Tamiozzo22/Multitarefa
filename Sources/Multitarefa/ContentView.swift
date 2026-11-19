@@ -98,7 +98,7 @@ struct TopBar: View {
                     .frame(width: 18, height: 18)
             }
             .glassButton(prominent: store.page == .tags)
-            .help(store.page == .tags ? "Voltar pras tarefas" : "Tags")
+            .help(store.page == .tags ? "Voltar para as tarefas" : "Tags")
 
             Button {
                 store.showSettings = true
@@ -181,10 +181,10 @@ struct HeroCard: View {
                 }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Comece pela primeira tarefa")
+                    Text("Adicione a primeira tarefa")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(Color.white)
-                    Text("Cada tarefa ganha uma rodada de \(TaskStore.defaultDuration / 60) minutos. Quando o tempo acabar, o alarme toca e você decide quando trocar.")
+                    Text("Cada tarefa recebe uma rodada de \(TaskStore.defaultDuration / 60) minutos. Ao fim do tempo, o alarme toca e você decide quando trocar.")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -291,9 +291,9 @@ struct SwitchBalloon: View {
 
     private var goLabel: String {
         if let name = store.switchTargetTitle(pending) {
-            return "Salvar e ir pra \"\(name)\""
+            return "Salvar e ir para \"\(name)\""
         }
-        return "Salvar e começar nova rodada"
+        return "Salvar e iniciar nova rodada"
     }
 
     var body: some View {
@@ -305,7 +305,7 @@ struct SwitchBalloon: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.white)
             }
-            TextField("Ex: parei no item 3 da planilha", text: $text)
+            TextField("Exemplo: parei no item 3 da planilha", text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .foregroundStyle(Color.white)
@@ -317,7 +317,7 @@ struct SwitchBalloon: View {
             HStack(spacing: 8) {
                 Button(goLabel, action: confirm)
                     .glassButton(prominent: true)
-                Button("Ir sem anotar") { store.confirmSwitch(note: "") }
+                Button("Continuar sem anotar") { store.confirmSwitch(note: "") }
                     .glassButton()
                 Spacer()
                 if pending.automatic {
@@ -396,7 +396,7 @@ struct QueueSection: View {
             }
 
             if store.queue.isEmpty {
-                EmptyHint(icon: "tray", text: "A fila está vazia. Escreva uma tarefa acima e aperte Enter.")
+                EmptyHint(icon: "tray", text: "A fila está vazia. Digite uma tarefa acima e pressione Enter.")
             } else {
                 ForEach(Array(store.queue.enumerated()), id: \.element.id) { index, task in
                     QueueRow(task: task, position: index)
@@ -469,7 +469,7 @@ struct QueueRow: View {
 
             HStack(spacing: 4) {
                 if !isCurrent {
-                    RowIconButton(icon: "play.fill", help: "Fazer agora") { store.requestSwitch(to: task.id) }
+                    RowIconButton(icon: "play.fill", help: "Iniciar agora") { store.requestSwitch(to: task.id) }
                 }
                 RowIconButton(icon: "pencil", help: "Editar") { store.edit(task.id) }
                 RowIconButton(icon: "archivebox", help: "Arquivar para depois") {
@@ -515,7 +515,7 @@ struct ArchivedSection: View {
     var body: some View {
         VStack(spacing: 10) {
             if store.archived.isEmpty {
-                EmptyHint(icon: "archivebox", text: "Tarefas arquivadas ficam aqui até você trazer de volta pra fila.")
+                EmptyHint(icon: "archivebox", text: "As tarefas arquivadas ficam aqui até que você as devolva à fila.")
             } else {
                 ForEach(store.archived) { task in
                     HStack(spacing: 12) {
@@ -538,12 +538,12 @@ struct ArchivedSection: View {
                         Button {
                             withAnimation { store.restore(task.id) }
                         } label: {
-                            Label("Voltar pra fila", systemImage: "arrow.uturn.left")
+                            Label("Voltar para a fila", systemImage: "arrow.uturn.left")
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .glassButton()
                         RowIconButton(icon: "pencil", help: "Editar") { store.edit(task.id) }
-                        RowIconButton(icon: "trash", help: "Mover pra lixeira") {
+                        RowIconButton(icon: "trash", help: "Mover para a lixeira") {
                             withAnimation { store.moveToTrash(task.id) }
                         }
                     }
@@ -565,7 +565,7 @@ struct HistorySection: View {
     var body: some View {
         VStack(spacing: 10) {
             if store.completed.isEmpty {
-                EmptyHint(icon: "checkmark.seal", text: "Quando você concluir uma tarefa, ela aparece aqui com o tempo total que levou.")
+                EmptyHint(icon: "checkmark.seal", text: "As tarefas concluídas aparecem aqui com o tempo total dedicado a cada uma.")
             } else {
                 HStack(spacing: 12) {
                     StatTile(value: "\(store.completed.count)", label: "concluídas")
@@ -580,11 +580,11 @@ struct HistorySection: View {
                 }
             }
         }
-        .confirmationDialog("Mandar todo o histórico pra lixeira?", isPresented: $confirmClear) {
-            Button("Mover pra lixeira", role: .destructive) { store.clearHistory() }
+        .confirmationDialog("Mover todo o histórico para a lixeira?", isPresented: $confirmClear) {
+            Button("Mover para a lixeira", role: .destructive) { store.clearHistory() }
             Button("Cancelar", role: .cancel) {}
         } message: {
-            Text("Você ainda pode recuperar pela Lixeira por \(TaskStore.trashDays) dias.")
+            Text("As tarefas poderão ser recuperadas pela Lixeira por \(TaskStore.trashDays) dias.")
         }
     }
 }
@@ -614,7 +614,7 @@ struct CompletedRow: View {
             RowIconButton(icon: "arrow.uturn.left", help: "Reabrir") {
                 withAnimation { store.reopen(task.id) }
             }
-            RowIconButton(icon: "trash", help: "Mover pra lixeira") {
+            RowIconButton(icon: "trash", help: "Mover para a lixeira") {
                 withAnimation { store.moveToTrash(task.id) }
             }
         }
@@ -624,7 +624,7 @@ struct CompletedRow: View {
     }
 }
 
-/// Menu rápido pra marcar/desmarcar tags de uma tarefa.
+/// Menu rápido para marcar/desmarcar tags de uma tarefa.
 struct TagMenuButton: View {
     @EnvironmentObject var store: TaskStore
     let task: TaskItem
@@ -632,7 +632,7 @@ struct TagMenuButton: View {
     var body: some View {
         Menu {
             if store.tags.isEmpty {
-                Text("Crie tags na tela de Tags ou ao editar a tarefa")
+                Text("Crie tags na tela de Tags ou na edição da tarefa")
             }
             ForEach(store.tags) { tag in
                 Button {
@@ -670,7 +670,7 @@ struct TrashSection: View {
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
                     .foregroundStyle(Theme.yellow)
-                Text("Tarefas ficam \(TaskStore.trashDays) dias na lixeira e depois são apagadas de vez.")
+                Text("As tarefas permanecem na lixeira por \(TaskStore.trashDays) dias e depois são excluídas definitivamente.")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
@@ -691,7 +691,7 @@ struct TrashSection: View {
                                 .foregroundStyle(Color.white)
                             TaskTagsLine(task: task)
                             let days = store.daysLeftInTrash(task)
-                            Text("Veio de \(task.deletedFrom?.label ?? "Fila") · some em \(days) dia\(days == 1 ? "" : "s")")
+                            Text("Origem: \(task.deletedFrom?.label ?? "Fila") · exclusão definitiva em \(days) dia\(days == 1 ? "" : "s")")
                                 .font(.system(size: 11))
                                 .foregroundStyle(days <= 1 ? Theme.danger : Theme.textMuted)
                         }
@@ -703,7 +703,7 @@ struct TrashSection: View {
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .glassButton()
-                        RowIconButton(icon: "xmark", help: "Apagar de vez") {
+                        RowIconButton(icon: "xmark", help: "Excluir definitivamente") {
                             withAnimation { store.deleteForever(task.id) }
                         }
                     }
@@ -713,8 +713,8 @@ struct TrashSection: View {
                 }
             }
         }
-        .confirmationDialog("Apagar de vez tudo que está na lixeira?", isPresented: $confirmEmpty) {
-            Button("Apagar tudo", role: .destructive) { store.emptyTrash() }
+        .confirmationDialog("Excluir definitivamente todos os itens da lixeira?", isPresented: $confirmEmpty) {
+            Button("Excluir tudo", role: .destructive) { store.emptyTrash() }
             Button("Cancelar", role: .cancel) {}
         }
     }

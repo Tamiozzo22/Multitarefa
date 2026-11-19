@@ -126,7 +126,7 @@ struct EditTaskView: View {
                                                     .fixedSize(horizontal: false, vertical: true)
                                             }
                                             Spacer()
-                                            RowIconButton(icon: "trash", help: "Apagar anotação") {
+                                            RowIconButton(icon: "trash", help: "Excluir anotação") {
                                                 store.deleteNote(taskID, noteID: note.id)
                                             }
                                         }
@@ -146,7 +146,7 @@ struct EditTaskView: View {
                                     store.moveToTrash(taskID)
                                     dismiss()
                                 } label: {
-                                    Label("Mover pra lixeira", systemImage: "trash")
+                                    Label("Mover para a lixeira", systemImage: "trash")
                                         .foregroundStyle(Theme.danger)
                                 }
                                 .glassButton()
@@ -161,7 +161,7 @@ struct EditTaskView: View {
                     minutes = task.durationSeconds / 60
                 }
             } else {
-                Text("Essa tarefa não existe mais.")
+                Text("Esta tarefa não existe mais.")
                     .foregroundStyle(Theme.textSecondary)
             }
         }
@@ -216,7 +216,7 @@ struct FlowChips: View {
     }
 }
 
-/// Linha que quebra quando não cabe (pras tags).
+/// Linha que quebra quando não cabe (para as tags).
 struct WrapHStack: Layout {
     var spacing: CGFloat = 6
 

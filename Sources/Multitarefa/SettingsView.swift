@@ -40,7 +40,7 @@ struct SettingsView: View {
                             Button {
                                 updater.installAndRelaunch()
                             } label: {
-                                Label("Reiniciar pra atualizar", systemImage: "arrow.clockwise")
+                                Label("Reiniciar e atualizar", systemImage: "arrow.clockwise")
                                     .font(.system(size: 13, weight: .semibold))
                             }
                             .glassButton(prominent: true)
@@ -56,7 +56,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    Text("A versão nova é baixada e instalada sozinha. Se você não reiniciar agora, ela é aplicada quando fechar o app.")
+                    Text("A nova versão é baixada e instalada automaticamente. Caso não reinicie agora, ela será aplicada quando o aplicativo for fechado.")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -96,8 +96,13 @@ struct SettingsView: View {
                 Text("Baixando a versão \(v)…").statusStyle()
             }
         case .ready(let v):
-            Label("Versão \(v) pronta. Reinicie pra começar a usar.", systemImage: "sparkles")
+            Label("A versão \(v) está pronta. Reinicie o aplicativo para utilizá-la.", systemImage: "sparkles")
                 .statusStyle(color: Theme.yellow)
+        case .installing:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Instalando e reiniciando…").statusStyle()
+            }
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .statusStyle(color: Theme.danger)
