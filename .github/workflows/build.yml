@@ -21,7 +21,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Multitarefa
-          path: dist/Multitarefa.zip
+          path: dist/Multitarefa.dmg
 
       - name: Publicar na página de Releases
         env:
@@ -29,7 +29,7 @@ jobs:
         run: |
           gh release delete latest --yes --cleanup-tag || true
           sleep 3
-          gh release create latest dist/Multitarefa.zip \
+          gh release create latest dist/Multitarefa.dmg \
             --target "$GITHUB_SHA" \
             --title "Multitarefa (versão mais recente)" \
-            --notes "Baixe o Multitarefa.zip abaixo, descompacte e arraste o Multitarefa.app para a pasta Aplicativos. Na primeira vez, libere em Ajustes do Sistema > Privacidade e Segurança > Abrir Mesmo Assim."
+            --notes "Baixe o Multitarefa.dmg abaixo, abra e arraste o Multitarefa para a pasta Aplicativos. Na primeira vez, libere em Ajustes do Sistema > Privacidade e Segurança > Abrir Mesmo Assim."

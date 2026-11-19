@@ -5,7 +5,7 @@
 <h1 align="center">Multitarefa</h1>
 
 <p align="center">
-  <a href="https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.zip">
+  <a href="https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.dmg">
     <img src="Resources/download-button.svg" width="420" alt="Baixar para Mac">
   </a>
 </p>
@@ -35,13 +35,13 @@ App de Mac para trabalhar em várias tarefas em rodízio. Cada tarefa ganha uma 
 
 ## Instalar
 
-1. Clique no botão **Baixar para macOS** no topo desta página (ou [baixe aqui](https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.zip)).
-2. Abra o zip e arraste `Multitarefa.app` para a pasta **Aplicativos**.
+1. Clique no botão **Baixar para macOS** no topo desta página (ou [baixe aqui](https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.dmg)).
+2. Abra o `Multitarefa.dmg` e, na janela que aparecer, arraste o **Multitarefa** para o atalho **Aplicativos**. Depois pode ejetar o disco.
 3. Na primeira vez, o macOS bloqueia porque o app não é de um desenvolvedor registrado na Apple. Vá em **Ajustes do Sistema → Privacidade e Segurança**, desça até o fim e clique em **Abrir Mesmo Assim**. Só precisa fazer isso uma vez.
 4. Permita as notificações quando o app pedir.
 
 ## Como o app é compilado
 
-Toda vez que o código muda na branch `main`, o GitHub Actions compila o app num Mac da nuvem (`scripts/build-app.sh`) e publica o zip em **Releases → latest**. Dá pra acompanhar na aba **Actions**.
+Toda vez que o código muda na branch `main`, o GitHub Actions compila o app num Mac da nuvem (`scripts/build-app.sh`) e publica o DMG em **Releases → latest**. Dá pra acompanhar na aba **Actions**.
 
 Pra mudar a duração das rodadas, edite `slotSeconds` em `Sources/Multitarefa/TaskStore.swift`.

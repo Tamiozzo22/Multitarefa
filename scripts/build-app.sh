@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila o Multitarefa.app (Intel + Apple Silicon) e gera dist/Multitarefa.zip.
+# Compila o Multitarefa.app (Intel + Apple Silicon) e gera dist/Multitarefa.dmg.
 # Roda no GitHub Actions; também funciona num Mac com Xcode: bash scripts/build-app.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -33,5 +33,11 @@ fi
 # Assinatura local (ad-hoc), necessária para rodar em Apple Silicon.
 codesign --force --deep --sign - "$BUNDLE"
 
-(cd "$DIST" && ditto -c -k --keepParent "$APP.app" "$APP.zip")
-echo "Pronto: $DIST/$APP.zip"
+# DMG: janela com o app e um atalho para Aplicativos, pra arrastar.
+STAGE="$DIST/dmg"
+mkdir -p "$STAGE"
+cp -R "$BUNDLE" "$STAGE/"
+ln -s /Applications "$STAGE/Aplicativos"
+hdiutil create -volname "$APP" -srcfolder "$STAGE" -ov -format UDZO "$DIST/$APP.dmg"
+rm -rf "$STAGE"
+echo "Pronto: $DIST/$APP.dmg"
