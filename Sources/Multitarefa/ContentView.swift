@@ -71,7 +71,7 @@ struct TopBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            BrandLogo(height: 30)
+            BrandLogo(height: 34)
             Rectangle()
                 .fill(Theme.hairline)
                 .frame(width: 1, height: 22)
