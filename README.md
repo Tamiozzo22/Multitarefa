@@ -10,20 +10,22 @@
   </a>
 </p>
 
-<p align="center">macOS 13 (Ventura) ou mais novo · Apple Silicon e Intel</p>
+<p align="center">macOS 14 ou mais novo · Liquid Glass no macOS 26+ · Apple Silicon e Intel</p>
 
-App de Mac para trabalhar em várias tarefas em rodízio. Cada tarefa ganha uma rodada de 10 minutos. Quando o alarme toca, o app passa pra próxima, e assim vai até você concluir tudo.
+App de Mac da **Impera Services** para trabalhar em várias tarefas em rodízio, com timer por tarefa.
 
 ## Como funciona
 
-- **Rodízio:** a tarefa do topo da fila é a atual. Quando o timer dela zera, toca um alarme, ela vai pro fim da fila (com o timer zerado de novo) e a próxima começa.
-- **Aviso de 1 minuto:** um som suave avisa que está acabando, pra você fechar o raciocínio.
-- **"Onde parei":** quando a rodada termina, o app pede uma frase curta de onde você parou. Quando a tarefa volta, essa frase aparece em destaque.
-- **Concluir:** clique no círculo da tarefa (a qualquer momento, mesmo antes do timer acabar).
-- **Arquivar:** o ícone de caixa guarda a tarefa pra depois. Ela pode voltar pra fila na aba Arquivadas.
-- **Histórico:** cada tarefa concluída mostra o tempo total que você passou nela, somando todas as rodadas, e quantas rodadas levou.
+- **Rodadas com timer:** a tarefa do topo da fila é a atual. Cada rodada tem 10 minutos por padrão (dá pra mudar por tarefa).
+- **Você decide quando trocar:** quando o tempo acaba, o alarme toca, aparece uma notificação e o timer para em 00:00. Aí é com você: **Próxima tarefa** ou **+5 min**.
+- **Fazer agora:** o botão ▶ de qualquer tarefa da fila pula direto pra ela.
+- **Editar durante a execução:** título, duração da rodada, tempo restante e anotações, tudo com o timer rodando.
+- **Anotações com horário:** cada tarefa tem um diário de anotações. Ao trocar de tarefa, o app pergunta "onde você parou?".
+- **Aviso de 1 minuto** antes do fim da rodada.
+- **Concluir e arquivar:** concluídas vão pro **Histórico** com o tempo total gasto (todas as rodadas somadas); arquivadas ficam guardadas pra depois.
 - **Barra de menus:** o tempo restante fica sempre visível lá em cima. Fechar a janela não para o timer.
-- **Salva sozinho:** as tarefas ficam em `~/Library/Application Support/Multitarefa/state.json`.
+- **Atualização automática:** em Configurações (⚙ ou ⌘,), **Buscar atualização** baixa e instala a versão nova do GitHub.
+- **Salva sozinho** em `~/Library/Application Support/Multitarefa/`.
 
 ### Atalhos
 
@@ -32,6 +34,8 @@ App de Mac para trabalhar em várias tarefas em rodízio. Cada tarefa ganha uma 
 | ⌘ ↩ | Iniciar ou pausar |
 | ⌘ → | Próxima tarefa |
 | ⌘ D | Concluir a tarefa atual |
+| ⌘ E | Editar a tarefa atual |
+| ⌘ , | Configurações |
 
 ## Instalar
 
@@ -44,4 +48,4 @@ App de Mac para trabalhar em várias tarefas em rodízio. Cada tarefa ganha uma 
 
 Toda vez que o código muda na branch `main`, o GitHub Actions compila o app num Mac da nuvem (`scripts/build-app.sh`) e publica o DMG em **Releases → latest**. Dá pra acompanhar na aba **Actions**.
 
-Pra mudar a duração das rodadas, edite `slotSeconds` em `Sources/Multitarefa/TaskStore.swift`.
+A duração padrão das rodadas fica em `defaultDuration`, em `Sources/Multitarefa/TaskStore.swift`. A versão do app é o conteúdo do arquivo `VERSION` mais o número do build.
