@@ -1,0 +1,35 @@
+name: Compilar app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar Multitarefa.app
+        run: bash scripts/build-app.sh
+
+      - name: Guardar o app como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: Multitarefa
+          path: dist/Multitarefa.zip
+
+      - name: Publicar na página de Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          sleep 3
+          gh release create latest dist/Multitarefa.zip \
+            --target "$GITHUB_SHA" \
+            --title "Multitarefa (versão mais recente)" \
+            --notes "Baixe o Multitarefa.zip abaixo, descompacte e arraste o Multitarefa.app para a pasta Aplicativos. Na primeira vez, libere em Ajustes do Sistema > Privacidade e Segurança > Abrir Mesmo Assim."

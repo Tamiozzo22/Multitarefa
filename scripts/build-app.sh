@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Compila o Multitarefa.app (Intel + Apple Silicon) e gera dist/Multitarefa.zip.
+# Roda no GitHub Actions; também funciona num Mac com Xcode: bash scripts/build-app.sh
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+APP="Multitarefa"
+ARCHS=(--arch arm64 --arch x86_64)
+
+swift build -c release "${ARCHS[@]}"
+BIN_DIR="$(swift build -c release "${ARCHS[@]}" --show-bin-path)"
+
+DIST="dist"
+BUNDLE="$DIST/$APP.app"
+rm -rf "$DIST"
+mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
+
+cp "$BIN_DIR/$APP" "$BUNDLE/Contents/MacOS/$APP"
+cp Resources/Info.plist "$BUNDLE/Contents/Info.plist"
+
+if [ -f Resources/AppIcon.png ]; then
+  ICONSET="$DIST/AppIcon.iconset"
+  mkdir -p "$ICONSET"
+  for s in 16 32 128 256 512; do
+    d=$((s * 2))
+    sips -z "$s" "$s" Resources/AppIcon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+    sips -z "$d" "$d" Resources/AppIcon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$ICONSET" -o "$BUNDLE/Contents/Resources/AppIcon.icns"
+  rm -rf "$ICONSET"
+fi
+
+# Assinatura local (ad-hoc), necessária para rodar em Apple Silicon.
+codesign --force --deep --sign - "$BUNDLE"
+
+(cd "$DIST" && ditto -c -k --keepParent "$APP.app" "$APP.zip")
+echo "Pronto: $DIST/$APP.zip"
