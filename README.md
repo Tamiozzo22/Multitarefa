@@ -1,4 +1,16 @@
-# Multitarefa
+<p align="center">
+  <img src="Resources/AppIcon.png" width="128" alt="Ícone do Multitarefa">
+</p>
+
+<h1 align="center">Multitarefa</h1>
+
+<p align="center">
+  <a href="https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.zip">
+    <img src="https://img.shields.io/badge/Baixar_para_macOS-Multitarefa.zip-534AB7?style=for-the-badge&logo=apple&logoColor=white" alt="Baixar para macOS">
+  </a>
+</p>
+
+<p align="center">macOS 13 (Ventura) ou mais novo · Apple Silicon e Intel</p>
 
 App de Mac para trabalhar em várias tarefas em rodízio. Cada tarefa ganha uma rodada de 10 minutos. Quando o alarme toca, o app passa pra próxima, e assim vai até você concluir tudo.
 
@@ -23,12 +35,10 @@ App de Mac para trabalhar em várias tarefas em rodízio. Cada tarefa ganha uma 
 
 ## Instalar
 
-1. Vá em **Releases** (lado direito da página do repositório) e baixe `Multitarefa.zip`.
+1. Clique no botão **Baixar para macOS** no topo desta página (ou [baixe aqui](https://github.com/Tamiozzo22/Multitarefa/releases/download/latest/Multitarefa.zip)).
 2. Abra o zip e arraste `Multitarefa.app` para a pasta **Aplicativos**.
 3. Na primeira vez, o macOS bloqueia porque o app não é de um desenvolvedor registrado na Apple. Vá em **Ajustes do Sistema → Privacidade e Segurança**, desça até o fim e clique em **Abrir Mesmo Assim**. Só precisa fazer isso uma vez.
 4. Permita as notificações quando o app pedir.
-
-Requer macOS 13 (Ventura) ou mais novo.
 
 ## Como o app é compilado
 
