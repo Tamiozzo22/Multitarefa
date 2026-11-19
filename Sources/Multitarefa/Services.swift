@@ -17,13 +17,21 @@ enum Sound {
         sound.play()
     }
 
-    /// Alarme de fim de rodada: toca 3 vezes.
-    static func alarm() {
+    /// Duração aproximada de uma sequência de alarme (segundos).
+    static let alarmLength: Double = 3.3
+
+    /// Alarme de fim de rodada: toca 3 vezes, enquanto `isActive` for verdadeiro.
+    static func alarm(isActive: @escaping () -> Bool) {
         for i in 0..<3 {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 1.1) {
-                play("Glass")
+                if isActive() { play("Glass") }
             }
         }
+    }
+
+    static func stopAll() {
+        for s in playing where s.isPlaying { s.stop() }
+        playing.removeAll()
     }
 
     /// Aviso suave de 1 minuto.

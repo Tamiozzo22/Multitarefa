@@ -1,8 +1,14 @@
+import AppKit
 import Foundation
 import SwiftUI
 
+enum Page {
+    case tasks, tags
+}
+
 /// Toda a lógica do app. A tarefa atual é sempre a primeira da fila.
-/// O app nunca troca de tarefa sozinho: quando o tempo acaba, o alarme toca e o timer para em 00:00.
+/// O app nunca troca de tarefa sozinho: quando o tempo acaba, o alarme toca
+/// (e repete) até você agir no app.
 final class TaskStore: ObservableObject {
     /// Duração padrão de uma rodada para tarefas novas.
     static let defaultDuration = 10 * 60
@@ -10,16 +16,27 @@ final class TaskStore: ObservableObject {
     static let warningSeconds = 60
     /// Opções rápidas de duração (minutos).
     static let durationPresets = [5, 10, 15, 20, 25, 30, 45, 60]
+    /// Dias que uma tarefa fica na lixeira.
+    static let trashDays = 5
+    /// Espera depois do alarme antes de tocar de novo.
+    static let alarmRepeatDelay: Double = 5
 
     @Published var queue: [TaskItem] = []
     @Published var archived: [TaskItem] = []
     @Published var completed: [TaskItem] = []
+    @Published var trash: [TaskItem] = []
+    @Published var tags: [TagDef] = []
+
     @Published var isRunning = false
-    @Published var pendingNote: PendingNote?
+    @Published var alarmActive = false
+    @Published var pendingSwitch: PendingSwitch?
     @Published var editing: EditTarget?
     @Published var showSettings = false
+    @Published var page: Page = .tasks
 
     private var timer: Timer?
+    private var alarmTimer: Timer?
+    private var housekeepingTimer: Timer?
     private var lastTick = Date()
     private var ticksSinceSave = 0
 
@@ -28,12 +45,21 @@ final class TaskStore: ObservableObject {
             queue = saved.queue
             archived = saved.archived
             completed = saved.completed
+            trash = saved.trash
+            tags = saved.tags
         }
         let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.tick()
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
+
+        let h = Timer(timeInterval: 3600, repeats: true) { [weak self] _ in
+            self?.purgeTrash()
+        }
+        RunLoop.main.add(h, forMode: .common)
+        housekeepingTimer = h
+        purgeTrash()
     }
 
     // MARK: - Leitura
@@ -51,13 +77,31 @@ final class TaskStore: ObservableObject {
         completed.reduce(0) { $0 + $1.totalSeconds }
     }
 
+    /// Todas as tarefas que não estão na lixeira.
+    var allTasks: [TaskItem] { queue + archived + completed }
+
     func task(_ id: UUID) -> TaskItem? {
-        queue.first { $0.id == id } ?? archived.first { $0.id == id } ?? completed.first { $0.id == id }
+        queue.first { $0.id == id }
+            ?? archived.first { $0.id == id }
+            ?? completed.first { $0.id == id }
+            ?? trash.first { $0.id == id }
+    }
+
+    func origin(of id: UUID) -> TaskOrigin? {
+        if queue.contains(where: { $0.id == id }) { return .queue }
+        if archived.contains(where: { $0.id == id }) { return .archived }
+        if completed.contains(where: { $0.id == id }) { return .completed }
+        return nil
     }
 
     func isCurrent(_ id: UUID) -> Bool { current?.id == id }
 
-    /// Altera uma tarefa onde quer que ela esteja (fila, arquivadas ou histórico).
+    /// Nome da tarefa pra onde a troca vai levar.
+    func switchTargetTitle(_ p: PendingSwitch) -> String? {
+        if let t = p.targetID { return task(t)?.title }
+        return queue.count > 1 ? queue[1].title : nil
+    }
+
     private func mutate(_ id: UUID, _ change: (inout TaskItem) -> Void) {
         if let i = queue.firstIndex(where: { $0.id == id }) {
             change(&queue[i])
@@ -65,6 +109,8 @@ final class TaskStore: ObservableObject {
             change(&archived[i])
         } else if let i = completed.firstIndex(where: { $0.id == id }) {
             change(&completed[i])
+        } else if let i = trash.firstIndex(where: { $0.id == id }) {
+            change(&trash[i])
         }
     }
 
@@ -72,11 +118,13 @@ final class TaskStore: ObservableObject {
 
     func start() {
         guard let c = current, !c.isTimeUp else { return }
+        stopAlarm()
         lastTick = Date()
         isRunning = true
     }
 
     func pause() {
+        stopAlarm()
         isRunning = false
         save()
     }
@@ -92,7 +140,6 @@ final class TaskStore: ObservableObject {
         guard elapsed >= 1 else { return }
         lastTick = lastTick.addingTimeInterval(Double(elapsed))
 
-        // Se o Mac dormiu, não conta mais que o restante da rodada.
         let before = queue[0].remaining
         let used = min(elapsed, before)
         queue[0].remaining -= used
@@ -114,53 +161,105 @@ final class TaskStore: ObservableObject {
         }
     }
 
-    /// O tempo acabou: toca o alarme e espera você trocar de tarefa no app.
+    /// O tempo acabou: alarme (repetindo) e o balão de "onde parei" na tarefa atual.
     private func timeUp() {
         guard let c = queue.first else { return }
         isRunning = false
-        Sound.alarm()
+        if pendingSwitch == nil {
+            pendingSwitch = PendingSwitch(taskID: c.id, title: c.title, targetID: nil, automatic: true)
+        }
         Notifier.send(title: "Tempo de \"\(c.title)\" acabou",
-                      body: "Abra o Multitarefa pra passar pra próxima tarefa.")
+                      body: "Abra o Multitarefa, anote onde parou e passe pra próxima tarefa.")
+        startAlarm()
         save()
     }
 
-    // MARK: - Troca de tarefa (sempre manual)
+    // MARK: - Alarme
 
-    /// Manda a tarefa atual pro fim da fila, zerando a contagem dela.
-    private func rotateCurrent() {
-        guard !queue.isEmpty else { return }
-        var t = queue.removeFirst()
-        if t.remaining < t.durationSeconds { t.rounds += 1 }
-        t.remaining = t.durationSeconds
-        queue.append(t)
-        pendingNote = PendingNote(taskID: t.id, title: t.title)
+    private func startAlarm() {
+        alarmActive = true
+        ring()
     }
 
-    /// Passa pra próxima tarefa da fila e já começa o timer dela.
-    func next() {
-        guard queue.count > 1 else {
-            // Só uma tarefa: começa uma rodada nova dela.
-            if var only = queue.first {
-                if only.remaining < only.durationSeconds { only.rounds += 1 }
-                only.remaining = only.durationSeconds
-                queue[0] = only
-                start()
-                save()
-            }
-            return
+    private func ring() {
+        guard alarmActive else { return }
+        Sound.alarm { [weak self] in self?.alarmActive ?? false }
+        NSApp.requestUserAttention(.criticalRequest)
+        alarmTimer?.invalidate()
+        let t = Timer(timeInterval: Sound.alarmLength + Self.alarmRepeatDelay, repeats: false) { [weak self] _ in
+            self?.ring()
         }
-        rotateCurrent()
+        RunLoop.main.add(t, forMode: .common)
+        alarmTimer = t
+    }
+
+    /// Para o alarme. Qualquer ação sua no app chama isso.
+    func stopAlarm() {
+        guard alarmActive else { return }
+        alarmActive = false
+        alarmTimer?.invalidate()
+        alarmTimer = nil
+        Sound.stopAll()
+    }
+
+    // MARK: - Troca de tarefa (sempre manual, com "onde parei" antes)
+
+    /// Pede pra ir pra próxima: abre o balão na tarefa atual.
+    func requestNext() {
+        guard let c = current else { return }
+        stopAlarm()
+        pendingSwitch = PendingSwitch(taskID: c.id, title: c.title, targetID: nil,
+                                      automatic: c.isTimeUp)
+    }
+
+    /// Pede pra ir direto pra uma tarefa da fila.
+    func requestSwitch(to id: UUID) {
+        guard let c = current, c.id != id, queue.contains(where: { $0.id == id }) else { return }
+        stopAlarm()
+        pendingSwitch = PendingSwitch(taskID: c.id, title: c.title, targetID: id,
+                                      automatic: c.isTimeUp)
+    }
+
+    /// Salva a anotação (se tiver) e faz a troca.
+    func confirmSwitch(note: String) {
+        guard let p = pendingSwitch else { return }
+        stopAlarm()
+        addNote(p.taskID, note)
+        pendingSwitch = nil
+        if let target = p.targetID {
+            performSwitch(to: target)
+        } else {
+            performNext()
+        }
+    }
+
+    func cancelSwitch() {
+        stopAlarm()
+        pendingSwitch = nil
+    }
+
+    private func finishRound(_ t: inout TaskItem) {
+        if t.remaining < t.durationSeconds { t.rounds += 1 }
+        t.remaining = t.durationSeconds
+    }
+
+    private func performNext() {
+        guard !queue.isEmpty else { return }
+        var t = queue.removeFirst()
+        finishRound(&t)
+        queue.append(t)
         start()
         save()
     }
 
-    /// Pula direto pra uma tarefa específica da fila.
-    func switchTo(_ id: UUID) {
-        guard !isCurrent(id), queue.contains(where: { $0.id == id }) else { return }
-        rotateCurrent()
+    private func performSwitch(to id: UUID) {
+        guard !queue.isEmpty, !isCurrent(id) else { return }
+        var t = queue.removeFirst()
+        finishRound(&t)
+        queue.append(t)
         if let i = queue.firstIndex(where: { $0.id == id }) {
-            let t = queue.remove(at: i)
-            queue.insert(t, at: 0)
+            let target = queue.remove(at: i)
+            queue.insert(target, at: 0)
         }
         start()
         save()
@@ -191,8 +290,7 @@ final class TaskStore: ObservableObject {
     func archive(_ id: UUID) {
         guard let i = queue.firstIndex(where: { $0.id == id }) else { return }
         var t = queue.remove(at: i)
-        if t.remaining < t.durationSeconds { t.rounds += 1 }
-        t.remaining = t.durationSeconds
+        finishRound(&t)
         t.archivedAt = Date()
         archived.insert(t, at: 0)
         afterRemoval(at: i, id: id)
@@ -200,11 +298,12 @@ final class TaskStore: ObservableObject {
 
     private func afterRemoval(at index: Int, id: UUID) {
         if index == 0 {
-            // A próxima tarefa espera você apertar Iniciar.
+            stopAlarm()
             isRunning = false
+            pendingSwitch = nil
         }
         if queue.isEmpty { isRunning = false }
-        if pendingNote?.taskID == id { pendingNote = nil }
+        if pendingSwitch?.taskID == id || pendingSwitch?.targetID == id { pendingSwitch = nil }
         if editing?.id == id { editing = nil }
         save()
     }
@@ -218,7 +317,6 @@ final class TaskStore: ObservableObject {
         save()
     }
 
-    /// Volta uma tarefa concluída pra fila.
     func reopen(_ id: UUID) {
         guard let i = completed.firstIndex(where: { $0.id == id }) else { return }
         var t = completed.remove(at: i)
@@ -228,17 +326,86 @@ final class TaskStore: ObservableObject {
         save()
     }
 
-    func deleteArchived(_ id: UUID) {
-        archived.removeAll { $0.id == id }
+    // MARK: - Lixeira
+
+    /// Manda pra lixeira (de qualquer lista).
+    func moveToTrash(_ id: UUID) {
+        var item: TaskItem?
+        var from: TaskOrigin?
+        if let i = queue.firstIndex(where: { $0.id == id }) {
+            var t = queue.remove(at: i)
+            finishRound(&t)
+            item = t
+            from = .queue
+            afterRemoval(at: i, id: id)
+        } else if let i = archived.firstIndex(where: { $0.id == id }) {
+            item = archived.remove(at: i)
+            from = .archived
+        } else if let i = completed.firstIndex(where: { $0.id == id }) {
+            item = completed.remove(at: i)
+            from = .completed
+        }
+        guard var t = item else { return }
+        t.deletedAt = Date()
+        t.deletedFrom = from
+        trash.insert(t, at: 0)
+        if editing?.id == id { editing = nil }
         save()
     }
 
-    func deleteCompleted(_ id: UUID) {
-        completed.removeAll { $0.id == id }
+    /// Volta da lixeira pro lugar de onde saiu.
+    func restoreFromTrash(_ id: UUID) {
+        guard let i = trash.firstIndex(where: { $0.id == id }) else { return }
+        var t = trash.remove(at: i)
+        let from = t.deletedFrom ?? .queue
+        t.deletedAt = nil
+        t.deletedFrom = nil
+        switch from {
+        case .queue:
+            t.remaining = t.durationSeconds
+            queue.append(t)
+        case .archived:
+            archived.insert(t, at: 0)
+        case .completed:
+            completed.insert(t, at: 0)
+            completed.sort { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }
+        }
         save()
     }
 
+    func deleteForever(_ id: UUID) {
+        trash.removeAll { $0.id == id }
+        save()
+    }
+
+    func emptyTrash() {
+        trash.removeAll()
+        save()
+    }
+
+    /// Dias até a tarefa sumir da lixeira.
+    func daysLeftInTrash(_ t: TaskItem) -> Int {
+        guard let d = t.deletedAt else { return Self.trashDays }
+        let limit = d.addingTimeInterval(Double(Self.trashDays) * 86_400)
+        let left = limit.timeIntervalSinceNow / 86_400
+        return max(0, Int(left.rounded(.up)))
+    }
+
+    func purgeTrash() {
+        let cutoff = Date().addingTimeInterval(-Double(Self.trashDays) * 86_400)
+        let before = trash.count
+        trash.removeAll { ($0.deletedAt ?? Date()) < cutoff }
+        if trash.count != before { save() }
+    }
+
+    /// "Limpar histórico" manda tudo pra lixeira.
     func clearHistory() {
+        let now = Date()
+        for var t in completed {
+            t.deletedAt = now
+            t.deletedFrom = .completed
+            trash.insert(t, at: 0)
+        }
         completed.removeAll()
         save()
     }
@@ -246,17 +413,17 @@ final class TaskStore: ObservableObject {
     // MARK: - Edição
 
     func edit(_ id: UUID) {
+        if isCurrent(id) { stopAlarm() }
         editing = EditTarget(id: id)
     }
 
     func setTitle(_ id: UUID, _ title: String) {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clean.isEmpty else { return }
+        guard !clean.isEmpty, task(id)?.title != clean else { return }
         mutate(id) { $0.title = clean }
         save()
     }
 
-    /// Muda a duração da rodada. O tempo restante acompanha a diferença.
     func setDuration(_ id: UUID, minutes: Int) {
         let newDuration = max(1, min(240, minutes)) * 60
         mutate(id) { t in
@@ -271,6 +438,7 @@ final class TaskStore: ObservableObject {
     /// Adiciona (ou tira) tempo da rodada atual. Se o tempo tinha acabado, já retoma.
     func addTime(_ id: UUID, seconds: Int) {
         let wasTimeUp = isCurrent(id) && isTimeUp
+        if isCurrent(id) { stopAlarm() }
         mutate(id) { t in
             t.remaining = max(0, t.remaining + seconds)
             if t.remaining > t.durationSeconds { t.durationSeconds = t.remaining }
@@ -279,6 +447,7 @@ final class TaskStore: ObservableObject {
             if isTimeUp {
                 isRunning = false
             } else if wasTimeUp && seconds > 0 {
+                if pendingSwitch?.automatic == true { pendingSwitch = nil }
                 start()
             }
         }
@@ -297,20 +466,71 @@ final class TaskStore: ObservableObject {
         save()
     }
 
-    func savePendingNote(_ text: String) {
-        guard let p = pendingNote else { return }
-        addNote(p.taskID, text)
-        pendingNote = nil
+    // MARK: - Tags
+
+    func tag(_ id: UUID) -> TagDef? { tags.first { $0.id == id } }
+
+    func tags(for task: TaskItem) -> [TagDef] {
+        task.tagIDs.compactMap { tag($0) }
     }
 
-    func dismissNote() {
-        pendingNote = nil
+    func count(for tagID: UUID) -> Int {
+        allTasks.filter { $0.tagIDs.contains(tagID) }.count
+    }
+
+    @discardableResult
+    func createTag(_ name: String) -> TagDef? {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return nil }
+        if let existing = tags.first(where: { $0.name.lowercased() == clean.lowercased() }) {
+            return existing
+        }
+        let t = TagDef(name: clean, color: tags.count % Theme.tagColors.count)
+        tags.append(t)
+        tags.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        save()
+        return t
+    }
+
+    func renameTag(_ id: UUID, _ name: String) {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, let i = tags.firstIndex(where: { $0.id == id }) else { return }
+        tags[i].name = clean
+        tags.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        save()
+    }
+
+    func setTagColor(_ id: UUID, _ color: Int) {
+        guard let i = tags.firstIndex(where: { $0.id == id }) else { return }
+        tags[i].color = color
+        save()
+    }
+
+    func deleteTag(_ id: UUID) {
+        tags.removeAll { $0.id == id }
+        for i in queue.indices { queue[i].tagIDs.removeAll { $0 == id } }
+        for i in archived.indices { archived[i].tagIDs.removeAll { $0 == id } }
+        for i in completed.indices { completed[i].tagIDs.removeAll { $0 == id } }
+        for i in trash.indices { trash[i].tagIDs.removeAll { $0 == id } }
+        save()
+    }
+
+    func toggleTag(_ taskID: UUID, _ tagID: UUID) {
+        mutate(taskID) { t in
+            if t.tagIDs.contains(tagID) {
+                t.tagIDs.removeAll { $0 == tagID }
+            } else {
+                t.tagIDs.append(tagID)
+            }
+        }
+        save()
     }
 
     // MARK: - Disco
 
     func save() {
         ticksSinceSave = 0
-        Persistence.save(SavedState(queue: queue, archived: archived, completed: completed))
+        Persistence.save(SavedState(queue: queue, archived: archived, completed: completed,
+                                    trash: trash, tags: tags))
     }
 }

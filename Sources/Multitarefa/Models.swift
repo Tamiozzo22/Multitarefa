@@ -24,6 +24,11 @@ struct TaskItem: Identifiable, Codable, Equatable {
     var createdAt: Date = Date()
     var completedAt: Date? = nil
     var archivedAt: Date? = nil
+    /// Tags (ids de TagDef).
+    var tagIDs: [UUID] = []
+    /// Quando foi pra lixeira e de onde veio.
+    var deletedAt: Date? = nil
+    var deletedFrom: TaskOrigin? = nil
 
     init(title: String, durationSeconds: Int) {
         self.title = title
@@ -38,6 +43,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case id, title, durationSeconds, remaining, totalSeconds, rounds, notes
         case createdAt, completedAt, archivedAt
+        case tagIDs, deletedAt, deletedFrom
         case note
     }
 
@@ -52,6 +58,9 @@ struct TaskItem: Identifiable, Codable, Equatable {
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
         archivedAt = try c.decodeIfPresent(Date.self, forKey: .archivedAt)
+        tagIDs = try c.decodeIfPresent([UUID].self, forKey: .tagIDs) ?? []
+        deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
+        deletedFrom = try c.decodeIfPresent(TaskOrigin.self, forKey: .deletedFrom)
         if let list = try c.decodeIfPresent([NoteEntry].self, forKey: .notes) {
             notes = list
         } else if let old = try c.decodeIfPresent(String.self, forKey: .note), !old.isEmpty {
@@ -71,13 +80,40 @@ struct TaskItem: Identifiable, Codable, Equatable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encodeIfPresent(completedAt, forKey: .completedAt)
         try c.encodeIfPresent(archivedAt, forKey: .archivedAt)
+        try c.encode(tagIDs, forKey: .tagIDs)
+        try c.encodeIfPresent(deletedAt, forKey: .deletedAt)
+        try c.encodeIfPresent(deletedFrom, forKey: .deletedFrom)
     }
 }
 
-/// Pedido de anotação mostrado quando você troca de tarefa.
-struct PendingNote: Equatable {
+/// De onde a tarefa veio (pra voltar da lixeira pro lugar certo).
+enum TaskOrigin: String, Codable {
+    case queue, archived, completed
+
+    var label: String {
+        switch self {
+        case .queue: return "Fila"
+        case .archived: return "Arquivadas"
+        case .completed: return "Histórico"
+        }
+    }
+}
+
+/// Uma tag criada por você.
+struct TagDef: Identifiable, Codable, Equatable, Hashable {
+    var id: UUID = UUID()
+    var name: String
+    var color: Int
+}
+
+/// Troca de tarefa esperando você anotar onde parou.
+struct PendingSwitch: Equatable {
     let taskID: UUID
     let title: String
+    /// Pra qual tarefa ir (nil = próxima da fila).
+    let targetID: UUID?
+    /// true quando foi aberta porque o tempo acabou.
+    let automatic: Bool
 }
 
 /// Tarefa sendo editada (para a janela de edição).
@@ -90,6 +126,29 @@ struct SavedState: Codable {
     var queue: [TaskItem]
     var archived: [TaskItem]
     var completed: [TaskItem]
+    var trash: [TaskItem]
+    var tags: [TagDef]
+
+    init(queue: [TaskItem], archived: [TaskItem], completed: [TaskItem], trash: [TaskItem], tags: [TagDef]) {
+        self.queue = queue
+        self.archived = archived
+        self.completed = completed
+        self.trash = trash
+        self.tags = tags
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case queue, archived, completed, trash, tags
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        queue = try c.decodeIfPresent([TaskItem].self, forKey: .queue) ?? []
+        archived = try c.decodeIfPresent([TaskItem].self, forKey: .archived) ?? []
+        completed = try c.decodeIfPresent([TaskItem].self, forKey: .completed) ?? []
+        trash = try c.decodeIfPresent([TaskItem].self, forKey: .trash) ?? []
+        tags = try c.decodeIfPresent([TagDef].self, forKey: .tags) ?? []
+    }
 }
 
 enum Format {

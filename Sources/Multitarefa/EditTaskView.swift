@@ -9,6 +9,7 @@ struct EditTaskView: View {
     @State private var title = ""
     @State private var newNote = ""
     @State private var minutes = 10
+    @State private var newTag = ""
 
     var body: some View {
         ZStack {
@@ -28,6 +29,30 @@ struct EditTaskView: View {
 
                         section("Título") {
                             GlassField(placeholder: "Nome da tarefa", text: $title, onSubmit: commitTitle)
+                        }
+
+                        section("Tags") {
+                            VStack(alignment: .leading, spacing: 10) {
+                                if !store.tags.isEmpty {
+                                    WrapHStack(spacing: 6) {
+                                        ForEach(store.tags) { tag in
+                                            Button {
+                                                store.toggleTag(taskID, tag.id)
+                                            } label: {
+                                                TagChip(tag: tag, selected: task.tagIDs.contains(tag.id))
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                }
+                                HStack(spacing: 8) {
+                                    GlassField(placeholder: "Criar tag e marcar nesta tarefa…", text: $newTag, onSubmit: addTag)
+                                    Button(action: addTag) {
+                                        Image(systemName: "plus")
+                                    }
+                                    .glassButton()
+                                }
+                            }
                         }
 
                         section("Duração de cada rodada") {
@@ -115,11 +140,22 @@ struct EditTaskView: View {
                         HStack(spacing: 12) {
                             StatTile(value: Format.duration(task.totalSeconds), label: "tempo total")
                             StatTile(value: "\(task.rounds)", label: "rodadas")
+                            Spacer()
+                            if task.deletedAt == nil {
+                                Button(role: .destructive) {
+                                    store.moveToTrash(taskID)
+                                    dismiss()
+                                } label: {
+                                    Label("Mover pra lixeira", systemImage: "trash")
+                                        .foregroundStyle(Theme.danger)
+                                }
+                                .glassButton()
+                            }
                         }
                     }
                     .padding(24)
                 }
-                .scrollIndicators(.never)
+                .scrollIndicators(.visible)
                 .onAppear {
                     title = task.title
                     minutes = task.durationSeconds / 60
@@ -149,6 +185,13 @@ struct EditTaskView: View {
         store.setTitle(taskID, title)
     }
 
+    private func addTag() {
+        if let t = store.createTag(newTag), !(store.task(taskID)?.tagIDs.contains(t.id) ?? true) {
+            store.toggleTag(taskID, t.id)
+        }
+        newTag = ""
+    }
+
     private func addNote() {
         store.addNote(taskID, newNote)
         newNote = ""
@@ -169,6 +212,43 @@ struct FlowChips: View {
             Text("min")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.textMuted)
+        }
+    }
+}
+
+/// Linha que quebra quando não cabe (pras tags).
+struct WrapHStack: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, widest: CGFloat = 0
+        for v in subviews {
+            let size = v.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > maxWidth {
+                y += lineHeight + spacing
+                x = 0
+                lineHeight = 0
+            }
+            x += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+            widest = max(widest, x - spacing)
+        }
+        return CGSize(width: min(widest, maxWidth), height: y + lineHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, lineHeight: CGFloat = 0
+        for v in subviews {
+            let size = v.sizeThatFits(.unspecified)
+            if x > bounds.minX && x + size.width > bounds.maxX {
+                y += lineHeight + spacing
+                x = bounds.minX
+                lineHeight = 0
+            }
+            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
         }
     }
 }

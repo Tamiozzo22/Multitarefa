@@ -51,8 +51,10 @@ struct MultitarefaApp: App {
             CommandMenu("Tarefas") {
                 Button("Iniciar ou pausar") { store.toggleRunning() }
                     .keyboardShortcut(.return, modifiers: .command)
-                Button("Próxima tarefa") { store.next() }
+                Button("Próxima tarefa") { store.requestNext() }
                     .keyboardShortcut(.rightArrow, modifiers: .command)
+                Button("Silenciar alarme") { store.stopAlarm() }
+                    .keyboardShortcut(".", modifiers: .command)
                 Button("Concluir tarefa atual") { store.completeCurrent() }
                     .keyboardShortcut("d", modifiers: .command)
                 Button("Editar tarefa atual") {
@@ -99,17 +101,27 @@ struct MenuBarContent: View {
             } else {
                 Button(store.isRunning ? "Pausar" : "Iniciar") { store.toggleRunning() }
             }
-            Button("Próxima tarefa") { store.next() }
+            Button("Próxima tarefa…") {
+                store.page = .tasks
+                store.requestNext()
+                openMain()
+            }
             Button("Concluir tarefa atual") { store.completeCurrent() }
         } else {
             Text("Nenhuma tarefa na fila")
         }
-        Divider()
-        Button("Abrir janela") {
-            openWindow(id: "main")
-            NSApp.activate(ignoringOtherApps: true)
+        if store.alarmActive {
+            Divider()
+            Button("Silenciar alarme") { store.stopAlarm() }
         }
+        Divider()
+        Button("Abrir janela") { openMain() }
         Button("Sair do Multitarefa") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+
+    private func openMain() {
+        openWindow(id: "main")
+        NSApp.activate(ignoringOtherApps: true)
     }
 }

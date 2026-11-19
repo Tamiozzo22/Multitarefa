@@ -190,3 +190,48 @@ struct TimerRing: View {
         .frame(width: 168, height: 168)
     }
 }
+
+// MARK: - Tags
+
+extension Theme {
+    static let tagColors: [Color] = [
+        Color(red: 1.0, green: 0.78, blue: 0.17),   // amarelo
+        Color(red: 0.36, green: 0.78, blue: 0.98),  // azul
+        Color(red: 0.42, green: 0.86, blue: 0.55),  // verde
+        Color(red: 1.0, green: 0.55, blue: 0.35),   // laranja
+        Color(red: 0.98, green: 0.45, blue: 0.62),  // rosa
+        Color(red: 0.72, green: 0.58, blue: 1.0),   // roxo
+        Color(red: 0.35, green: 0.85, blue: 0.82),  // turquesa
+        Color(red: 0.78, green: 0.78, blue: 0.8),   // cinza
+    ]
+
+    static let tagColorNames = ["Amarelo", "Azul", "Verde", "Laranja", "Rosa", "Roxo", "Turquesa", "Cinza"]
+
+    static func tagColor(_ index: Int) -> Color {
+        tagColors[((index % tagColors.count) + tagColors.count) % tagColors.count]
+    }
+}
+
+/// Etiqueta colorida de uma tag.
+struct TagChip: View {
+    let tag: TagDef
+    var selected = true
+    var small = false
+
+    var body: some View {
+        let color = Theme.tagColor(tag.color)
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: small ? 6 : 7, height: small ? 6 : 7)
+            Text(tag.name)
+                .font(.system(size: small ? 10.5 : 12, weight: .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(selected ? color : Theme.textSecondary)
+        .padding(.horizontal, small ? 7 : 10)
+        .padding(.vertical, small ? 3 : 5)
+        .background(color.opacity(selected ? 0.16 : 0.04), in: Capsule())
+        .overlay(Capsule().strokeBorder(color.opacity(selected ? 0.45 : 0.15), lineWidth: 1))
+    }
+}
