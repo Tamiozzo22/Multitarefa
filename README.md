@@ -21,8 +21,10 @@ Aplicativo para macOS da **Impera Services** que organiza o trabalho em várias 
 - **Alarme persistente:** se nenhuma ação for realizada no aplicativo em até 5 segundos após o alarme, ele toca novamente, até que você interaja com o aplicativo.
 - **Registro de onde parou:** antes de trocar de tarefa, o aplicativo solicita uma anotação sobre o ponto em que você parou.
 - **Iniciar agora:** o botão ▶ de qualquer tarefa da fila permite passar diretamente para ela.
-- **Edição durante a execução:** título, duração da rodada, tempo restante, tags e anotações podem ser alterados com o cronômetro em andamento.
-- **Anotações com data e hora:** cada tarefa possui um histórico próprio de anotações.
+- **Edição durante a execução:** título, subtarefas, duração da rodada, tempo restante, agendamento, tags e notas podem ser alterados com o cronômetro em andamento.
+- **Subtarefas:** cada tarefa pode ser dividida em etapas com caixas de seleção e barra de progresso, visíveis no cartão da tarefa atual e nas linhas da fila.
+- **Notas com data e hora:** cada tarefa possui um histórico próprio de notas, incluindo os registros de onde você parou.
+- **Tarefas agendadas:** planeje tarefas para outros dias, com horário opcional. Na data definida, a tarefa entra automaticamente na fila, com notificação.
 - **Aviso de 1 minuto** antes do fim de cada rodada.
 - **Concluídas e arquivadas:** as tarefas concluídas vão para o **Histórico**, com o tempo total dedicado a cada uma; as arquivadas ficam guardadas para uso posterior.
 - **Tags:** crie tags com cores, classifique as tarefas e encontre-as rapidamente pela tela de Tags, com busca por título ou anotação.
