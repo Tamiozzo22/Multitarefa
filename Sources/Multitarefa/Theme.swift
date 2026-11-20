@@ -2,10 +2,11 @@ import AppKit
 import SwiftUI
 
 enum Theme {
-    static let yellow = Color(red: 1.0, green: 0.78, blue: 0.17)
-    static let yellowSoft = Color(red: 1.0, green: 0.886, blue: 0.55)
-    static let background = Color(red: 0.035, green: 0.035, blue: 0.04)
-    static let danger = Color(red: 1.0, green: 0.42, blue: 0.36)
+    /// Âmbar fosco (cor principal).
+    static let yellow = Color(red: 0.851, green: 0.604, blue: 0.169)
+    static let yellowSoft = Color(red: 0.93, green: 0.79, blue: 0.55)
+    static let background = Color(red: 0.047, green: 0.043, blue: 0.04)
+    static let danger = Color(red: 0.93, green: 0.42, blue: 0.36)
     static let textSecondary = Color.white.opacity(0.62)
     static let textMuted = Color.white.opacity(0.4)
     static let hairline = Color.white.opacity(0.1)
@@ -16,10 +17,22 @@ struct AppBackground: View {
     var body: some View {
         ZStack {
             Theme.background
-            RadialGradient(colors: [Theme.yellow.opacity(0.22), .clear],
-                           center: .topLeading, startRadius: 0, endRadius: 520)
-            RadialGradient(colors: [Theme.yellow.opacity(0.10), .clear],
-                           center: .bottomTrailing, startRadius: 0, endRadius: 460)
+            // Manchas suaves de cor: dão o que o vidro refratar, sem brilho de neon.
+            Circle()
+                .fill(Theme.yellow.opacity(0.16))
+                .frame(width: 520, height: 520)
+                .blur(radius: 140)
+                .offset(x: -260, y: -300)
+            Circle()
+                .fill(Color(red: 0.45, green: 0.32, blue: 0.2).opacity(0.22))
+                .frame(width: 460, height: 460)
+                .blur(radius: 150)
+                .offset(x: 280, y: 320)
+            Circle()
+                .fill(Color(red: 0.2, green: 0.24, blue: 0.32).opacity(0.18))
+                .frame(width: 380, height: 380)
+                .blur(radius: 130)
+                .offset(x: 260, y: -220)
         }
         .ignoresSafeArea()
     }
@@ -30,14 +43,11 @@ struct AppBackground: View {
 extension View {
     /// Cartão de vidro. Usa o Liquid Glass nativo no macOS 26+.
     @ViewBuilder
-    func glassCard(cornerRadius: CGFloat = 22, tint: Color? = nil) -> some View {
+    func glassCard(cornerRadius: CGFloat = 22, tint: Color? = nil, interactive: Bool = false) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(macOS 26.0, *) {
-            if let tint = tint {
-                self.glassEffect(.regular.tint(tint), in: shape)
-            } else {
-                self.glassEffect(.regular, in: shape)
-            }
+            let base: Glass = tint.map { Glass.regular.tint($0) } ?? Glass.regular
+            self.glassEffect(base.interactive(interactive), in: shape)
         } else {
             self
                 .background(.ultraThinMaterial, in: shape)
@@ -70,6 +80,22 @@ struct GlassButtonModifier: ViewModifier {
             }
         } else {
             content.buttonStyle(FallbackGlassButtonStyle(prominent: prominent))
+        }
+    }
+}
+
+/// Agrupa elementos de vidro para que se fundam e se transformem juntos (macOS 26+).
+struct GlassGroup<Content: View>: View {
+    var spacing: CGFloat = 10
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) {
+                content()
+            }
+        } else {
+            content()
         }
     }
 }
@@ -161,7 +187,7 @@ struct TimerRing: View {
 
     private var color: Color {
         if remaining <= 0 { return Theme.danger }
-        if remaining <= TaskStore.warningSeconds { return Color.orange }
+        if remaining <= TaskStore.warningSeconds { return Color(red: 0.86, green: 0.45, blue: 0.2) }
         return Theme.yellow
     }
 
@@ -173,7 +199,7 @@ struct TimerRing: View {
                 .trim(from: 0, to: max(0.0001, progress))
                 .stroke(color, style: StrokeStyle(lineWidth: 12, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: color.opacity(0.5), radius: 8)
+                .shadow(color: color.opacity(0.25), radius: 4)
                 .animation(.linear(duration: 0.5), value: progress)
             VStack(spacing: 2) {
                 Text(Format.clock(remaining))
@@ -195,7 +221,7 @@ struct TimerRing: View {
 
 extension Theme {
     static let tagColors: [Color] = [
-        Color(red: 1.0, green: 0.78, blue: 0.17),   // amarelo
+        Color(red: 0.851, green: 0.604, blue: 0.169), // âmbar
         Color(red: 0.36, green: 0.78, blue: 0.98),  // azul
         Color(red: 0.42, green: 0.86, blue: 0.55),  // verde
         Color(red: 1.0, green: 0.55, blue: 0.35),   // laranja
@@ -205,7 +231,7 @@ extension Theme {
         Color(red: 0.78, green: 0.78, blue: 0.8),   // cinza
     ]
 
-    static let tagColorNames = ["Amarelo", "Azul", "Verde", "Laranja", "Rosa", "Roxo", "Turquesa", "Cinza"]
+    static let tagColorNames = ["Âmbar", "Azul", "Verde", "Laranja", "Rosa", "Roxo", "Turquesa", "Cinza"]
 
     static func tagColor(_ index: Int) -> Color {
         tagColors[((index % tagColors.count) + tagColors.count) % tagColors.count]

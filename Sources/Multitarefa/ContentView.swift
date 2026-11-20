@@ -1,12 +1,13 @@
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case queue, archived, history, trash
+    case queue, scheduled, archived, history, trash
     var id: String { rawValue }
 
     var icon: String {
         switch self {
         case .queue: return "list.bullet"
+        case .scheduled: return "calendar"
         case .archived: return "archivebox"
         case .history: return "clock.arrow.circlepath"
         case .trash: return "trash"
@@ -25,8 +26,8 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 TopBar(updateReady: updater.isReady)
                     .padding(.horizontal, 22)
-                    .padding(.top, 34)
-                    .padding(.bottom, 14)
+                    .padding(.top, 30)
+                    .padding(.bottom, 16)
 
                 switch store.page {
                 case .tasks:
@@ -36,6 +37,7 @@ struct ContentView: View {
                             TabBar(tab: $tab)
                             switch tab {
                             case .queue: QueueSection()
+                            case .scheduled: ScheduledSection()
                             case .archived: ArchivedSection()
                             case .history: HistorySection()
                             case .trash: TrashSection()
@@ -71,7 +73,7 @@ struct TopBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            BrandLogo(height: 34)
+            BrandLogo(height: 30)
             Rectangle()
                 .fill(Theme.hairline)
                 .frame(width: 1, height: 22)
@@ -79,37 +81,45 @@ struct TopBar: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary)
             Spacer()
-            if updateReady {
-                Button {
-                    store.showSettings = true
-                } label: {
-                    Label("Atualização pronta", systemImage: "arrow.down.circle")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .glassButton(prominent: true)
-            }
-            Button {
-                withAnimation(.spring(response: 0.3)) {
-                    store.page = store.page == .tags ? .tasks : .tags
-                }
-            } label: {
-                Image(systemName: store.page == .tags ? "checklist" : "tag")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 18, height: 18)
-            }
-            .glassButton(prominent: store.page == .tags)
-            .help(store.page == .tags ? "Voltar para as tarefas" : "Tags")
+            GlassGroup(spacing: 6) {
+                HStack(spacing: 6) {
+                    if updateReady {
+                        Button {
+                            store.showSettings = true
+                        } label: {
+                            Label("Atualização disponível", systemImage: "arrow.down.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .glassButton(prominent: true)
+                    }
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            store.page = store.page == .tags ? .tasks : .tags
+                        }
+                    } label: {
+                        Image(systemName: store.page == .tags ? "checklist" : "tag")
+                            .font(.system(size: 14, weight: .medium))
+                            .frame(width: 18, height: 18)
+                    }
+                    .glassButton(prominent: store.page == .tags)
+                    .help(store.page == .tags ? "Voltar para as tarefas" : "Tags")
 
-            Button {
-                store.showSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 18, height: 18)
+                    Button {
+                        store.showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14, weight: .medium))
+                            .frame(width: 18, height: 18)
+                    }
+                    .glassButton()
+                    .help("Configurações")
+                }
             }
-            .glassButton()
-            .help("Configurações")
         }
+        .padding(.leading, 18)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        .glassCard(cornerRadius: 26)
     }
 }
 
@@ -150,16 +160,7 @@ struct HeroCard: View {
                             }
 
                             if let note = c.latestNote {
-                                HStack(alignment: .top, spacing: 6) {
-                                    Image(systemName: "bookmark.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(Theme.yellow)
-                                        .padding(.top, 2)
-                                    Text(note.text)
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(Theme.textSecondary)
-                                        .lineLimit(2)
-                                }
+                                LastStopNote(note: note)
                             }
 
                             Text("Rodada de \(c.durationSeconds / 60) min · total \(Format.duration(c.totalSeconds)) · \(c.rounds) rodada(s)")
@@ -173,6 +174,10 @@ struct HeroCard: View {
                         }
                         Spacer(minLength: 0)
                     }
+
+                    SubtaskPanel(task: c)
+                        .padding(14)
+                        .glassCard(cornerRadius: 18)
 
                     if let p = store.pendingSwitch, p.taskID == c.id {
                         SwitchBalloon(pending: p)
@@ -194,6 +199,36 @@ struct HeroCard: View {
         }
         .padding(22)
         .glassCard(cornerRadius: 28, tint: store.alarmActive ? Theme.danger.opacity(0.14) : nil)
+    }
+}
+
+/// Destaque da última nota de "onde parei".
+struct LastStopNote: View {
+    let note: NoteEntry
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "bookmark.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.yellow)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ONDE PAREI · \(Format.date(note.date))")
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(Theme.textMuted)
+                Text(note.text)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Theme.yellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(Theme.yellow.opacity(0.2), lineWidth: 1))
     }
 }
 
@@ -224,6 +259,7 @@ struct HeroButtons: View {
     let task: TaskItem
 
     var body: some View {
+        GlassGroup(spacing: 8) {
         HStack(spacing: 8) {
             if task.isTimeUp {
                 Button {
@@ -277,6 +313,7 @@ struct HeroButtons: View {
             }
             .glassButton()
             .help("Editar tarefa")
+        }
         }
     }
 }
@@ -352,28 +389,63 @@ struct SwitchBalloon: View {
 struct TabBar: View {
     @EnvironmentObject var store: TaskStore
     @Binding var tab: Tab
+    @Namespace private var selection
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 2) {
             ForEach(Tab.allCases) { t in
                 Button {
-                    withAnimation(.spring(response: 0.3)) { tab = t }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { tab = t }
                 } label: {
-                    Label(title(t), systemImage: t.icon)
-                        .font(.system(size: 13, weight: .semibold))
+                    HStack(spacing: 6) {
+                        Image(systemName: t.icon)
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(title(t))
+                            .font(.system(size: 12.5, weight: .semibold))
+                        Text("\(count(t))")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background((tab == t ? Color.black : Color.white).opacity(0.12), in: Capsule())
+                    }
+                    .foregroundStyle(tab == t ? Color.black : Color.white.opacity(0.8))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .background {
+                        if tab == t {
+                            Capsule()
+                                .fill(Theme.yellow)
+                                .matchedGeometryEffect(id: "tab", in: selection)
+                        }
+                    }
+                    .contentShape(Capsule())
                 }
-                .glassButton(prominent: tab == t)
+                .buttonStyle(.plain)
             }
-            Spacer()
         }
+        .padding(4)
+        .glassCard(cornerRadius: 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func title(_ t: Tab) -> String {
         switch t {
-        case .queue: return "Fila \(store.queue.count)"
-        case .archived: return "Arquivadas \(store.archived.count)"
-        case .history: return "Histórico \(store.completed.count)"
-        case .trash: return "Lixeira \(store.trash.count)"
+        case .queue: return "Fila"
+        case .scheduled: return "Agendadas"
+        case .archived: return "Arquivadas"
+        case .history: return "Histórico"
+        case .trash: return "Lixeira"
+        }
+    }
+
+    private func count(_ t: Tab) -> Int {
+        switch t {
+        case .queue: return store.queue.count
+        case .scheduled: return store.scheduled.count
+        case .archived: return store.archived.count
+        case .history: return store.completed.count
+        case .trash: return store.trash.count
         }
     }
 }
@@ -429,61 +501,110 @@ struct QueueRow: View {
     @EnvironmentObject var store: TaskStore
     let task: TaskItem
     let position: Int
+    @State private var expanded = false
 
     private var isCurrent: Bool { position == 0 }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button {
-                withAnimation { store.complete(task.id) }
-            } label: {
-                Image(systemName: "circle")
-                    .font(.system(size: 20, weight: .light))
-                    .foregroundStyle(isCurrent ? Theme.yellow : Theme.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .help("Concluir tarefa")
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
-                    .font(.system(size: 14, weight: isCurrent ? .semibold : .regular))
-                    .foregroundStyle(Color.white)
-                TaskTagsLine(task: task)
-                if let note = task.latestNote {
-                    Text(note.text)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Button {
+                    withAnimation { store.complete(task.id) }
+                } label: {
+                    Image(systemName: "circle")
+                        .font(.system(size: 20, weight: .light))
+                        .foregroundStyle(isCurrent ? Theme.yellow : Theme.textSecondary)
                 }
-                Text("\(task.durationSeconds / 60) min por rodada · total \(Format.duration(task.totalSeconds))")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.textMuted)
-            }
+                .buttonStyle(.plain)
+                .help("Concluir tarefa")
 
-            Spacer()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(task.title)
+                        .font(.system(size: 14, weight: isCurrent ? .semibold : .regular))
+                        .foregroundStyle(Color.white)
+                    TaskTagsLine(task: task)
+                    HStack(spacing: 8) {
+                        Text("\(task.durationSeconds / 60) min por rodada · total \(Format.duration(task.totalSeconds))")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.textMuted)
+                    }
+                }
 
-            Text(isCurrent ? Format.clock(task.remaining) : "#\(position + 1)")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(isCurrent ? Theme.yellow : Theme.textMuted)
+                Spacer()
 
-            HStack(spacing: 4) {
                 if !isCurrent {
-                    RowIconButton(icon: "play.fill", help: "Iniciar agora") { store.requestSwitch(to: task.id) }
+                    ExpandChip(task: task, expanded: $expanded)
                 }
-                RowIconButton(icon: "pencil", help: "Editar") { store.edit(task.id) }
-                RowIconButton(icon: "archivebox", help: "Arquivar para depois") {
-                    withAnimation { store.archive(task.id) }
+
+                Text(isCurrent ? Format.clock(task.remaining) : "#\(position + 1)")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(isCurrent ? Theme.yellow : Theme.textMuted)
+
+                HStack(spacing: 4) {
+                    if !isCurrent {
+                        RowIconButton(icon: "play.fill", help: "Iniciar agora") { store.requestSwitch(to: task.id) }
+                    }
+                    RowIconButton(icon: "pencil", help: "Editar") { store.edit(task.id) }
+                    RowIconButton(icon: "archivebox", help: "Arquivar para depois") {
+                        withAnimation { store.archive(task.id) }
+                    }
                 }
+            }
+
+            if expanded && !isCurrent {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let note = task.latestNote {
+                        LastStopNote(note: note)
+                    }
+                    SubtaskPanel(task: task, compact: true)
+                }
+                .padding(.leading, 32)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .glassCard(cornerRadius: 18, tint: isCurrent ? Theme.yellow.opacity(0.12) : nil)
+        .glassCard(cornerRadius: 18, tint: isCurrent ? Theme.yellow.opacity(0.1) : nil, interactive: true)
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(isCurrent ? Theme.yellow.opacity(0.55) : Color.clear, lineWidth: 1)
+                .strokeBorder(isCurrent ? Theme.yellow.opacity(0.45) : Color.clear, lineWidth: 1)
         )
+    }
+}
+
+/// Botão que mostra o progresso das subtarefas e expande a linha.
+struct ExpandChip: View {
+    let task: TaskItem
+    @Binding var expanded: Bool
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { expanded.toggle() }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 11, weight: .semibold))
+                if task.subtasks.isEmpty {
+                    Text(task.notes.isEmpty ? "Subtarefas" : "Notas")
+                        .font(.system(size: 11, weight: .semibold))
+                } else {
+                    Text("\(task.subtasksDone)/\(task.subtasks.count)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .rotationEffect(.degrees(expanded ? 180 : 0))
+            }
+            .foregroundStyle(expanded ? Theme.yellow : Theme.textSecondary)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.white.opacity(expanded ? 0.1 : 0.05), in: Capsule())
+            .overlay(Capsule().strokeBorder(expanded ? Theme.yellow.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help(expanded ? "Recolher" : "Ver subtarefas e notas")
     }
 }
 
@@ -504,6 +625,115 @@ struct RowIconButton: View {
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .help(help)
+    }
+}
+
+// MARK: - Agendadas
+
+struct ScheduledSection: View {
+    @EnvironmentObject var store: TaskStore
+    @State private var title = ""
+    @State private var date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+    @State private var hasTime = false
+
+    private var groups: [(day: Date, tasks: [TaskItem])] {
+        let cal = Calendar.current
+        let grouped = Dictionary(grouping: store.scheduled) { cal.startOfDay(for: $0.scheduledFor ?? Date()) }
+        return grouped.keys.sorted().map { ($0, grouped[$0] ?? []) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    GlassField(placeholder: "Nova tarefa agendada…", text: $title, onSubmit: add)
+                    Button(action: add) {
+                        Label("Agendar", systemImage: "calendar.badge.plus")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .glassButton(prominent: true)
+                }
+                SchedulePicker(date: $date, hasTime: $hasTime)
+                Text(hasTime
+                     ? "A tarefa entrará na fila no dia e horário escolhidos, com notificação."
+                     : "A tarefa entrará na fila no início do dia escolhido.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.textMuted)
+            }
+            .padding(16)
+            .glassCard(cornerRadius: 20)
+
+            if store.scheduled.isEmpty {
+                EmptyHint(icon: "calendar", text: "Nenhuma tarefa agendada. Use o campo acima para planejar tarefas de outros dias.")
+            } else {
+                ForEach(groups, id: \.day) { group in
+                    Text(Format.day(group.day).uppercased())
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(Theme.yellow.opacity(0.9))
+                        .padding(.top, 6)
+                        .padding(.leading, 4)
+                    ForEach(group.tasks) { task in
+                        ScheduledRow(task: task)
+                    }
+                }
+            }
+        }
+    }
+
+    private func add() {
+        var when = date
+        if !hasTime { when = Calendar.current.startOfDay(for: date) }
+        store.addScheduled(title, date: when, hasTime: hasTime)
+        title = ""
+    }
+}
+
+struct ScheduledRow: View {
+    @EnvironmentObject var store: TaskStore
+    let task: TaskItem
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: task.scheduleHasTime ? "clock" : "calendar")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.yellow)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(task.title)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.white)
+                    TaskTagsLine(task: task)
+                    if let d = task.scheduledFor {
+                        Text("Entra na fila: \(Format.schedule(d, hasTime: task.scheduleHasTime))")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.textMuted)
+                    }
+                }
+                Spacer()
+                ExpandChip(task: task, expanded: $expanded)
+                Button {
+                    withAnimation { store.moveScheduledToQueue(task.id) }
+                } label: {
+                    Label("Adicionar à fila", systemImage: "arrow.right.circle")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .glassButton()
+                RowIconButton(icon: "pencil", help: "Editar e reagendar") { store.edit(task.id) }
+                RowIconButton(icon: "trash", help: "Mover para a lixeira") {
+                    withAnimation { store.moveToTrash(task.id) }
+                }
+            }
+            if expanded {
+                SubtaskPanel(task: task, compact: true)
+                    .padding(.leading, 28)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .glassCard(cornerRadius: 18, interactive: true)
     }
 }
 
@@ -604,6 +834,7 @@ struct CompletedRow: View {
                     .foregroundStyle(Color.white)
                 TaskTagsLine(task: task)
                 Text("\(Format.duration(task.totalSeconds)) · \(task.rounds) rodada(s)" +
+                     (task.subtasks.isEmpty ? "" : " · \(task.subtasksDone)/\(task.subtasks.count) subtarefas") +
                      (task.completedAt.map { " · \(Format.date($0))" } ?? ""))
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.textMuted)

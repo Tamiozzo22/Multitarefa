@@ -7,6 +7,15 @@ struct NoteEntry: Identifiable, Codable, Equatable {
     var date: Date = Date()
 }
 
+/// Uma subtarefa (item de checklist dentro da tarefa).
+struct Subtask: Identifiable, Codable, Equatable {
+    var id: UUID = UUID()
+    var text: String
+    var done: Bool = false
+    var createdAt: Date = Date()
+    var doneAt: Date? = nil
+}
+
 /// Uma tarefa.
 struct TaskItem: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
@@ -29,6 +38,12 @@ struct TaskItem: Identifiable, Codable, Equatable {
     /// Quando foi para lixeira e de onde veio.
     var deletedAt: Date? = nil
     var deletedFrom: TaskOrigin? = nil
+    /// Subtarefas (checklist).
+    var subtasks: [Subtask] = []
+    /// Agendamento: data em que a tarefa entra na fila.
+    var scheduledFor: Date? = nil
+    /// Se o agendamento tem horário (senão, entra no início do dia).
+    var scheduleHasTime: Bool = false
 
     init(title: String, durationSeconds: Int) {
         self.title = title
@@ -37,6 +52,13 @@ struct TaskItem: Identifiable, Codable, Equatable {
     }
 
     var latestNote: NoteEntry? { notes.last }
+    var subtasksDone: Int { subtasks.filter { $0.done }.count }
+
+    /// Momento em que a tarefa agendada deve entrar na fila.
+    var releaseDate: Date? {
+        guard let d = scheduledFor else { return nil }
+        return scheduleHasTime ? d : Calendar.current.startOfDay(for: d)
+    }
     var isTimeUp: Bool { remaining <= 0 }
 
     // Lê também o formato da versão 1 (campo "note" único, sem duração por tarefa).
@@ -44,6 +66,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         case id, title, durationSeconds, remaining, totalSeconds, rounds, notes
         case createdAt, completedAt, archivedAt
         case tagIDs, deletedAt, deletedFrom
+        case subtasks, scheduledFor, scheduleHasTime
         case note
     }
 
@@ -61,6 +84,9 @@ struct TaskItem: Identifiable, Codable, Equatable {
         tagIDs = try c.decodeIfPresent([UUID].self, forKey: .tagIDs) ?? []
         deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
         deletedFrom = try c.decodeIfPresent(TaskOrigin.self, forKey: .deletedFrom)
+        subtasks = try c.decodeIfPresent([Subtask].self, forKey: .subtasks) ?? []
+        scheduledFor = try c.decodeIfPresent(Date.self, forKey: .scheduledFor)
+        scheduleHasTime = try c.decodeIfPresent(Bool.self, forKey: .scheduleHasTime) ?? false
         if let list = try c.decodeIfPresent([NoteEntry].self, forKey: .notes) {
             notes = list
         } else if let old = try c.decodeIfPresent(String.self, forKey: .note), !old.isEmpty {
@@ -83,16 +109,20 @@ struct TaskItem: Identifiable, Codable, Equatable {
         try c.encode(tagIDs, forKey: .tagIDs)
         try c.encodeIfPresent(deletedAt, forKey: .deletedAt)
         try c.encodeIfPresent(deletedFrom, forKey: .deletedFrom)
+        try c.encode(subtasks, forKey: .subtasks)
+        try c.encodeIfPresent(scheduledFor, forKey: .scheduledFor)
+        try c.encode(scheduleHasTime, forKey: .scheduleHasTime)
     }
 }
 
 /// De onde a tarefa veio (para voltar da lixeira para o lugar certo).
 enum TaskOrigin: String, Codable {
-    case queue, archived, completed
+    case queue, scheduled, archived, completed
 
     var label: String {
         switch self {
         case .queue: return "Fila"
+        case .scheduled: return "Agendadas"
         case .archived: return "Arquivadas"
         case .completed: return "Histórico"
         }
@@ -128,8 +158,11 @@ struct SavedState: Codable {
     var completed: [TaskItem]
     var trash: [TaskItem]
     var tags: [TagDef]
+    var scheduled: [TaskItem]
 
-    init(queue: [TaskItem], archived: [TaskItem], completed: [TaskItem], trash: [TaskItem], tags: [TagDef]) {
+    init(queue: [TaskItem], archived: [TaskItem], completed: [TaskItem], trash: [TaskItem],
+         tags: [TagDef], scheduled: [TaskItem]) {
+        self.scheduled = scheduled
         self.queue = queue
         self.archived = archived
         self.completed = completed
@@ -138,7 +171,7 @@ struct SavedState: Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case queue, archived, completed, trash, tags
+        case queue, archived, completed, trash, tags, scheduled
     }
 
     init(from decoder: Decoder) throws {
@@ -148,6 +181,7 @@ struct SavedState: Codable {
         completed = try c.decodeIfPresent([TaskItem].self, forKey: .completed) ?? []
         trash = try c.decodeIfPresent([TaskItem].self, forKey: .trash) ?? []
         tags = try c.decodeIfPresent([TagDef].self, forKey: .tags) ?? []
+        scheduled = try c.decodeIfPresent([TaskItem].self, forKey: .scheduled) ?? []
     }
 }
 
@@ -176,5 +210,33 @@ enum Format {
 
     static func date(_ date: Date) -> String {
         dateFormatter.string(from: date)
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "pt_BR")
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "pt_BR")
+        f.dateFormat = "EEEE, dd 'de' MMMM"
+        return f
+    }()
+
+    /// "Hoje", "Amanhã" ou "sexta-feira, 21 de novembro".
+    static func day(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "Hoje" }
+        if cal.isDateInTomorrow(date) { return "Amanhã" }
+        let text = dayFormatter.string(from: date)
+        return text.prefix(1).uppercased() + text.dropFirst()
+    }
+
+    /// "Amanhã às 14:00" ou "Amanhã".
+    static func schedule(_ date: Date, hasTime: Bool) -> String {
+        hasTime ? "\(day(date)) às \(timeFormatter.string(from: date))" : day(date)
     }
 }

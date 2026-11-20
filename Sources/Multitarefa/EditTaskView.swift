@@ -10,6 +10,8 @@ struct EditTaskView: View {
     @State private var newNote = ""
     @State private var minutes = 10
     @State private var newTag = ""
+    @State private var schedDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+    @State private var schedHasTime = false
 
     var body: some View {
         ZStack {
@@ -29,6 +31,22 @@ struct EditTaskView: View {
 
                         section("Título") {
                             GlassField(placeholder: "Nome da tarefa", text: $title, onSubmit: commitTitle)
+                        }
+
+                        section("Subtarefas") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                if !task.subtasks.isEmpty {
+                                    SubtaskProgress(done: task.subtasksDone, total: task.subtasks.count)
+                                        .padding(.bottom, 4)
+                                }
+                                ForEach(task.subtasks) { sub in
+                                    SubtaskRow(taskID: taskID, subtask: sub, editable: true)
+                                        .id(sub.id)
+                                }
+                                AddSubtaskField(taskID: taskID)
+                            }
+                            .padding(14)
+                            .glassCard(cornerRadius: 16)
                         }
 
                         section("Tags") {
@@ -99,17 +117,45 @@ struct EditTaskView: View {
                             }
                         }
 
-                        section("Anotações") {
+                        if store.origin(of: taskID) != .completed && task.deletedAt == nil {
+                            section("Agendamento") {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    if let d = task.scheduledFor {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "calendar")
+                                                .foregroundStyle(Theme.yellow)
+                                            Text("Entra na fila: \(Format.schedule(d, hasTime: task.scheduleHasTime))")
+                                                .font(.system(size: 13))
+                                                .foregroundStyle(Color.white)
+                                            Spacer()
+                                            Button("Adicionar à fila agora") { store.moveScheduledToQueue(taskID) }
+                                                .glassButton()
+                                        }
+                                    }
+                                    SchedulePicker(date: $schedDate, hasTime: $schedHasTime)
+                                    Button {
+                                        let when = schedHasTime ? schedDate : Calendar.current.startOfDay(for: schedDate)
+                                        store.schedule(taskID, date: when, hasTime: schedHasTime)
+                                    } label: {
+                                        Label(task.scheduledFor == nil ? "Agendar para esta data" : "Reagendar",
+                                              systemImage: "calendar.badge.clock")
+                                    }
+                                    .glassButton(prominent: task.scheduledFor == nil)
+                                }
+                            }
+                        }
+
+                        section("Notas · onde parei") {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 8) {
-                                    GlassField(placeholder: "Nova anotação…", text: $newNote, onSubmit: addNote)
+                                    GlassField(placeholder: "Nova nota…", text: $newNote, onSubmit: addNote)
                                     Button(action: addNote) {
                                         Label("Adicionar", systemImage: "plus")
                                     }
                                     .glassButton(prominent: true)
                                 }
                                 if task.notes.isEmpty {
-                                    Text("Nenhuma anotação ainda.")
+                                    Text("Nenhuma nota ainda. As notas de \"onde parei\" também aparecem aqui.")
                                         .font(.system(size: 12))
                                         .foregroundStyle(Theme.textMuted)
                                 } else {
@@ -126,7 +172,7 @@ struct EditTaskView: View {
                                                     .fixedSize(horizontal: false, vertical: true)
                                             }
                                             Spacer()
-                                            RowIconButton(icon: "trash", help: "Excluir anotação") {
+                                            RowIconButton(icon: "trash", help: "Excluir nota") {
                                                 store.deleteNote(taskID, noteID: note.id)
                                             }
                                         }
@@ -159,13 +205,17 @@ struct EditTaskView: View {
                 .onAppear {
                     title = task.title
                     minutes = task.durationSeconds / 60
+                    if let d = task.scheduledFor {
+                        schedDate = d
+                        schedHasTime = task.scheduleHasTime
+                    }
                 }
             } else {
                 Text("Esta tarefa não existe mais.")
                     .foregroundStyle(Theme.textSecondary)
             }
         }
-        .frame(width: 520, height: 620)
+        .frame(width: 560, height: 680)
         .preferredColorScheme(.dark)
         .onDisappear(perform: commitTitle)
     }

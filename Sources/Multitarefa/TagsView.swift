@@ -25,7 +25,7 @@ struct TagsView: View {
     private var baseTasks: [TaskItem] {
         switch scope {
         case .completed: return store.completed
-        case .all: return store.queue + store.archived + store.completed
+        case .all: return store.queue + store.scheduled + store.archived + store.completed
         }
     }
 
@@ -229,6 +229,7 @@ struct TagResultRow: View {
     private var status: (String, Color) {
         switch store.origin(of: task.id) {
         case .queue: return ("Na fila", Theme.yellow)
+        case .scheduled: return ("Agendada", Color(red: 0.36, green: 0.78, blue: 0.98))
         case .archived: return ("Arquivada", Theme.textSecondary)
         case .completed: return ("Concluída", Color(red: 0.42, green: 0.86, blue: 0.55))
         case .none: return ("", Theme.textMuted)

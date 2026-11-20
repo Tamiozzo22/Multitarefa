@@ -39,10 +39,10 @@ struct MultitarefaApp: App {
         Window("Multitarefa", id: "main") {
             ContentView()
                 .environmentObject(store)
-                .frame(minWidth: 620, minHeight: 640)
+                .frame(minWidth: 740, minHeight: 680)
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 680, height: 780)
+        .defaultSize(width: 780, height: 880)
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("Configurações…") { store.showSettings = true }

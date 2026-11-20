@@ -26,6 +26,7 @@ final class TaskStore: ObservableObject {
     @Published var completed: [TaskItem] = []
     @Published var trash: [TaskItem] = []
     @Published var tags: [TagDef] = []
+    @Published var scheduled: [TaskItem] = []
 
     @Published var isRunning = false
     @Published var alarmActive = false
@@ -37,6 +38,7 @@ final class TaskStore: ObservableObject {
     private var timer: Timer?
     private var alarmTimer: Timer?
     private var housekeepingTimer: Timer?
+    private var releaseTimer: Timer?
     private var lastTick = Date()
     private var ticksSinceSave = 0
 
@@ -47,6 +49,7 @@ final class TaskStore: ObservableObject {
             completed = saved.completed
             trash = saved.trash
             tags = saved.tags
+            scheduled = saved.scheduled
         }
         let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.tick()
@@ -60,6 +63,13 @@ final class TaskStore: ObservableObject {
         RunLoop.main.add(h, forMode: .common)
         housekeepingTimer = h
         purgeTrash()
+
+        let r = Timer(timeInterval: 15, repeats: true) { [weak self] _ in
+            self?.releaseDueTasks()
+        }
+        RunLoop.main.add(r, forMode: .common)
+        releaseTimer = r
+        releaseDueTasks()
     }
 
     // MARK: - Leitura
@@ -78,10 +88,11 @@ final class TaskStore: ObservableObject {
     }
 
     /// Todas as tarefas que não estão na lixeira.
-    var allTasks: [TaskItem] { queue + archived + completed }
+    var allTasks: [TaskItem] { queue + scheduled + archived + completed }
 
     func task(_ id: UUID) -> TaskItem? {
         queue.first { $0.id == id }
+            ?? scheduled.first { $0.id == id }
             ?? archived.first { $0.id == id }
             ?? completed.first { $0.id == id }
             ?? trash.first { $0.id == id }
@@ -89,6 +100,7 @@ final class TaskStore: ObservableObject {
 
     func origin(of id: UUID) -> TaskOrigin? {
         if queue.contains(where: { $0.id == id }) { return .queue }
+        if scheduled.contains(where: { $0.id == id }) { return .scheduled }
         if archived.contains(where: { $0.id == id }) { return .archived }
         if completed.contains(where: { $0.id == id }) { return .completed }
         return nil
@@ -105,6 +117,8 @@ final class TaskStore: ObservableObject {
     private func mutate(_ id: UUID, _ change: (inout TaskItem) -> Void) {
         if let i = queue.firstIndex(where: { $0.id == id }) {
             change(&queue[i])
+        } else if let i = scheduled.firstIndex(where: { $0.id == id }) {
+            change(&scheduled[i])
         } else if let i = archived.firstIndex(where: { $0.id == id }) {
             change(&archived[i])
         } else if let i = completed.firstIndex(where: { $0.id == id }) {
@@ -338,6 +352,9 @@ final class TaskStore: ObservableObject {
             item = t
             from = .queue
             afterRemoval(at: i, id: id)
+        } else if let i = scheduled.firstIndex(where: { $0.id == id }) {
+            item = scheduled.remove(at: i)
+            from = .scheduled
         } else if let i = archived.firstIndex(where: { $0.id == id }) {
             item = archived.remove(at: i)
             from = .archived
@@ -364,6 +381,10 @@ final class TaskStore: ObservableObject {
         case .queue:
             t.remaining = t.durationSeconds
             queue.append(t)
+        case .scheduled:
+            scheduled.append(t)
+            sortScheduled()
+            releaseDueTasks()
         case .archived:
             archived.insert(t, at: 0)
         case .completed:
@@ -466,6 +487,125 @@ final class TaskStore: ObservableObject {
         save()
     }
 
+    // MARK: - Subtarefas
+
+    func addSubtask(_ id: UUID, _ text: String) {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        mutate(id) { $0.subtasks.append(Subtask(text: clean)) }
+        save()
+    }
+
+    func toggleSubtask(_ id: UUID, _ subID: UUID) {
+        mutate(id) { t in
+            guard let i = t.subtasks.firstIndex(where: { $0.id == subID }) else { return }
+            t.subtasks[i].done.toggle()
+            t.subtasks[i].doneAt = t.subtasks[i].done ? Date() : nil
+        }
+        save()
+    }
+
+    func renameSubtask(_ id: UUID, _ subID: UUID, _ text: String) {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        mutate(id) { t in
+            guard let i = t.subtasks.firstIndex(where: { $0.id == subID }) else { return }
+            t.subtasks[i].text = clean
+        }
+        save()
+    }
+
+    func deleteSubtask(_ id: UUID, _ subID: UUID) {
+        mutate(id) { $0.subtasks.removeAll { $0.id == subID } }
+        save()
+    }
+
+    func moveSubtask(_ id: UUID, _ subID: UUID, by offset: Int) {
+        mutate(id) { t in
+            guard let i = t.subtasks.firstIndex(where: { $0.id == subID }) else { return }
+            let j = i + offset
+            guard t.subtasks.indices.contains(j) else { return }
+            t.subtasks.swapAt(i, j)
+        }
+        save()
+    }
+
+    // MARK: - Agendamento
+
+    private func sortScheduled() {
+        scheduled.sort { ($0.releaseDate ?? .distantFuture) < ($1.releaseDate ?? .distantFuture) }
+    }
+
+    /// Cria uma tarefa agendada. Se a data já chegou, vai direto para a fila.
+    func addScheduled(_ title: String, date: Date, hasTime: Bool) {
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        var t = TaskItem(title: clean, durationSeconds: Self.defaultDuration)
+        t.scheduledFor = date
+        t.scheduleHasTime = hasTime
+        scheduled.append(t)
+        sortScheduled()
+        releaseDueTasks(notify: false)
+        save()
+    }
+
+    /// Agenda (ou reagenda) uma tarefa existente.
+    func schedule(_ id: UUID, date: Date, hasTime: Bool) {
+        var item: TaskItem?
+        if let i = scheduled.firstIndex(where: { $0.id == id }) {
+            item = scheduled.remove(at: i)
+        } else if let i = queue.firstIndex(where: { $0.id == id }) {
+            var t = queue.remove(at: i)
+            finishRound(&t)
+            item = t
+            afterRemoval(at: i, id: id)
+        } else if let i = archived.firstIndex(where: { $0.id == id }) {
+            var t = archived.remove(at: i)
+            t.archivedAt = nil
+            item = t
+        }
+        guard var t = item else { return }
+        t.scheduledFor = date
+        t.scheduleHasTime = hasTime
+        scheduled.append(t)
+        sortScheduled()
+        releaseDueTasks(notify: false)
+        save()
+    }
+
+    /// Tira o agendamento e coloca a tarefa na fila agora.
+    func moveScheduledToQueue(_ id: UUID) {
+        guard let i = scheduled.firstIndex(where: { $0.id == id }) else { return }
+        var t = scheduled.remove(at: i)
+        t.scheduledFor = nil
+        t.scheduleHasTime = false
+        t.remaining = t.durationSeconds
+        queue.append(t)
+        save()
+    }
+
+    /// Move para a fila as tarefas cuja data chegou.
+    func releaseDueTasks(notify: Bool = true) {
+        let now = Date()
+        let due = scheduled.filter { ($0.releaseDate ?? .distantFuture) <= now }
+        guard !due.isEmpty else { return }
+        scheduled.removeAll { ($0.releaseDate ?? .distantFuture) <= now }
+        for var t in due {
+            t.scheduledFor = nil
+            t.scheduleHasTime = false
+            t.remaining = t.durationSeconds
+            queue.append(t)
+        }
+        if notify {
+            if due.count == 1 {
+                Notifier.send(title: "Nova tarefa na fila", body: "\"\(due[0].title)\" chegou à fila de hoje.")
+            } else {
+                Notifier.send(title: "Novas tarefas na fila", body: "\(due.count) tarefas agendadas chegaram à fila de hoje.")
+            }
+        }
+        save()
+    }
+
     // MARK: - Tags
 
     func tag(_ id: UUID) -> TagDef? { tags.first { $0.id == id } }
@@ -510,6 +650,7 @@ final class TaskStore: ObservableObject {
         tags.removeAll { $0.id == id }
         for i in queue.indices { queue[i].tagIDs.removeAll { $0 == id } }
         for i in archived.indices { archived[i].tagIDs.removeAll { $0 == id } }
+        for i in scheduled.indices { scheduled[i].tagIDs.removeAll { $0 == id } }
         for i in completed.indices { completed[i].tagIDs.removeAll { $0 == id } }
         for i in trash.indices { trash[i].tagIDs.removeAll { $0 == id } }
         save()
@@ -531,6 +672,6 @@ final class TaskStore: ObservableObject {
     func save() {
         ticksSinceSave = 0
         Persistence.save(SavedState(queue: queue, archived: archived, completed: completed,
-                                    trash: trash, tags: tags))
+                                    trash: trash, tags: tags, scheduled: scheduled))
     }
 }
